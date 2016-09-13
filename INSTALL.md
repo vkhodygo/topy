@@ -1,6 +1,6 @@
 # Prerequisites
 
-1. Start by installing Python 2.7 (32-bit works fine), download from the official site. If you're uing Linux, you most probably have it already.
+1. Start by installing Python 2.7 (32-bit works fine), download from the official site. If you're using Linux, you most probably have it already.
 1. **Windows only:** Make sure Python is in your Path Environment Variable.
 	1. If you don't know how to add it, please search the web.
 	1. Check if Python works by typing it into a *cmd* shell.
@@ -9,9 +9,16 @@
 	1. Install NumPy+MKL for Python 2.7 from here: http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy
 	1. Install PySparse, also from http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy
 	1. Install PyVTK, also from http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy
-1. **Linux**: Install above packages via `pip` or by other means (e.g., apt-get, yum, rpm, etc).
-1. Install matplotlib via `pip`
-1. Install SymPy via `pip`
+1. **Linux**:
+	1. On Ubuntu 16.04, run the following commands in a terminal: (they should normally work on any debian-based OS)
+		1. `sudo apt-get install -y python-pip python-dev python-tk libpython-dev libevent-dev libsuperlu-dev libblas-dev liblapack-dev libatlas3-base libatlas-dev`
+		2. `pip install --upgrade pip`
+		3. `sudo pip install matplotlib setuptools SymPy pysparse pyvtk`
+		4. Then download manually the files you want or download the full project (run in a terminal the following: `git clone https://github.com/williamhunter/topy`)
+		5. According to what you are waiting from the software, if you want to do 3D topology optimizations, then you should also install Paraview: `sudo apt-get install -y paraview`
+	1. On other Linux OS, you should install above packages (NumPy+MKL, Pysparse, PyVTK) via `pip` or by other means (e.g., apt-get, yum, rpm, etc). Then:
+		1. Install matplotlib via `pip`
+		1. Install SymPy via `pip`
 
 Installing matplotlib and SymPy via other 'official' channels should also work fine (in that ToPy should still work).
 
