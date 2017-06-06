@@ -64,14 +64,16 @@ def delete_rows_csr(mat, indices):
 ################################################################################
 ##
 ##
-def update_add_mask_sym(K, updatedKe, e2sdofmap, mask):
+def update_add_mask_sym(K, updatedKe, e2sdofmap):
     #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
     #print(e2sdofmap)
     #print(type(K))#[e2sdofmap,e2sdofmap])
 
     list1 = np.array(e2sdofmap)[:,np.newaxis]
-    list2 = np.array(e2sdofmap)
-    K[list1,list2] += updatedKe
+    # list2 = np.array(e2sdofmap)
+    K[list1,list1.T] += updatedKe
+    
+    # K[np.ix_(e2sdofmap,e2sdofmap)] += updatedKe
 
     #for i in range(len(e2sdofmap)):
         #for j in range(len(e2sdofmap)):

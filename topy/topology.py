@@ -295,9 +295,9 @@ class Topology:
         #           self.dfree = Kfree * self.rfree
         #
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
-            Kfree = Kfree.to_csr() #  Need CSR for SuperLU factorisation
+            Kfree = Kfree.tocsc() #  Need CSR for SuperLU factorisation
             #lu = superlu.factorize(Kfree)
-            lu = spla.linalg.splu(Kfree)
+            lu = spla.splu(Kfree)
             #lu.solve(self.rfree, self.dfree)
             self.dfree = lu.solve(self.rfree)
             if self.probtype == 'mech':
@@ -598,6 +598,10 @@ class Topology:
 
         """
         if self.nelz == 0: #  2D problem
+        ########################################################################
+        ## Assembly of global stiffnes matrix as sum of local stiffnes matrixes
+        ## ToDo: betterway of assembly, this loop must be parallized for speed 
+        ##       improvements
             for elx in range(self.nelx):
                 for ely in range(self.nely):
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
@@ -607,10 +611,10 @@ class Topology:
                     elif self.probtype == 'heat':
                         updatedKe = (VOID + (1 - VOID) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
-                    mask = np.ones(e2sdofmap.size, dtype=int)
+                    # mask = np.ones(e2sdofmap.size, dtype=int)
 
                     #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
-                    K = update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                    K = update_add_mask_sym(K, updatedKe, e2sdofmap)
 
 
         else: #  3D problem
@@ -626,10 +630,10 @@ class Topology:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
+                        # mask = np.ones(e2sdofmap.size, dtype=int)
 
                         #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
-                        K = update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        K = update_add_mask_sym(K, updatedKe, e2sdofmap)
 
 
         #K.delete_rowcols(self._rcfixed) #  Del constrained rows and columns
