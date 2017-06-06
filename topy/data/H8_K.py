@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Write the stiffness matrix of finite element to file. The created file name
 # is equal to the string between the underscores of *this* file's name, plus a
@@ -14,19 +15,23 @@
 """
 
 from __future__ import division
+from __future__ import print_function
 
 from sympy import symbols, Matrix, diff, integrate, zeros
 
 from numpy import abs, array
 
-from matlcons import *
+from .matlcons import *
+from ..helper_functions import my_map
 
 # Get file name:
 fname = __file__.split('_')[0] + '.K'
+fname = __file__[:-5] + '.K'
+print("working on filename: {0}".format(fname))
 
 try:
     f = open(fname)
-    print fname ,'(stiffness matrix) exists!'
+    print('{0} (stiffness matrix) exists!'.format(fname))
     f.close()
 except IOError:
     # SymPy symbols:
@@ -53,18 +58,18 @@ except IOError:
     N8 = (a - x) * (b + y) * (c + z) / (8 * a * b * c)
 
     # Create strain-displacement matrix B:
-    B0 = map(diff, [N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0, 0,\
-                    N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0, 0], xlist)
-    B1 = map(diff, [0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0,\
-                    0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0], ylist)
-    B2 = map(diff, [0, 0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4,\
-                    0, 0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8], zlist)
-    B3 = map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
-                    N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], yxlist)
-    B4 = map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
-                    N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zylist)
-    B5 = map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
-                    N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zxlist)
+    B0 = my_map(diff, [N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0, 0,\
+                       N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0, 0], xlist)
+    B1 = my_map(diff, [0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0,\
+                       0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0], ylist)
+    B2 = my_map(diff, [0, 0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4,\
+                       0, 0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8], zlist)
+    B3 = my_map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
+                       N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], yxlist)
+    B4 = my_map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
+                       N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zylist)
+    B5 = my_map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
+                       N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zxlist)
     B = Matrix([B0, B1, B2, B3, B4, B5])
 
     # Create constitutive (material property) matrix:
@@ -78,7 +83,7 @@ except IOError:
     dK = B.T * C * B
 
     # Integration:
-    print 'SymPy is integrating: K for H8...'
+    print('SymPy is integrating: K for H8...')
     K = dK.integrate((x, -a, a),(y, -b, b),(z, -c, c))
 
     # Convert SymPy Matrix to NumPy array:
@@ -89,6 +94,6 @@ except IOError:
 
     # Create file:
     K.dump(fname)
-    print 'Created', fname, '(stiffness matrix).'
+    print('Created {0} (stiffness matrix).'.format(fname))
 
 # EOF H8_K.py

@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
 # conditions. Data is read from an input file, see 'examples' directory.
@@ -7,13 +8,16 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-from __future__ import division 
-from string import lower
+from __future__ import division
+#from string import lower
 import numpy as np
 import os
-from pysparse import superlu, itsolvers, precon
+#from pysparse import superlu, itsolvers, precon
+import scipy.sparse.linalg as spla
 from .parser import tpd_file2dict, config2dict
 from .topy_logging import Logger
+
+from .helper_functions import identity_minus_rows, update_add_mask_sym
 
 
 __all__ = ['Topology']
@@ -38,7 +42,7 @@ class Topology:
     values. Data is read from an input file (see 'examples' folder).
 
     """
-    def __init__(self, config=None, topydict={}, pcount=0, 
+    def __init__(self, config=None, topydict={}, pcount=0,
                  qcount=0, itercount=0, change=1, svtfrac=None):
         self.pcount = pcount #  Counter for continuation of p
         self.qcount = qcount #  Counter for continuation of q for GSF
@@ -214,7 +218,7 @@ class Topology:
             Logger.display('Damping factor (ETA) = %3.2f' % (self.eta.mean()))
 
         try:
-            self.approx = lower(self.topydict['APPROX'])
+            self.approx = str.lower(self.topydict['APPROX'])
         except KeyError:
             self.approx = None
         if self.approx == 'dquad':
@@ -280,31 +284,52 @@ class Topology:
 
         Kfree = self._updateK(self.K.copy())
 
+        ########################################################################
+        # Linear problem:
+        #           d = K * r
+        #           |   |   |- load
+        #           |   |- stiffness Matrix
+        #           |- displacement
+        #
+        # Linear problem with BC's included
+        #           self.dfree = Kfree * self.rfree
+        #
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
             Kfree = Kfree.to_csr() #  Need CSR for SuperLU factorisation
-            lu = superlu.factorize(Kfree)
-            lu.solve(self.rfree, self.dfree)
+            #lu = superlu.factorize(Kfree)
+            lu = spla.linalg.splu(Kfree)
+            #lu.solve(self.rfree, self.dfree)
+            self.dfree = lu.solve(self.rfree)
             if self.probtype == 'mech':
-                lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+                #lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+                self.dfreeout = lu.solve(self.rfreeout) # mechanism synthesis
         else: #  Iterative solver for 3D problems
-            Kfree = Kfree.to_sss()
-            preK = precon.ssor(Kfree) #  Preconditioned Kfree
-            (info, numitr, relerr) = \
-            itsolvers.pcg(Kfree, self.rfree, self.dfree, 1e-8, 8000, preK)
+            #Kfree = Kfree.to_sss()
+            #preK = precon.ssor(Kfree) #  Preconditioned Kfree
+            #(info, numitr, relerr) = \
+            #itsolvers.pcg(Kfree, self.rfree, self.dfree, 1e-8, 8000, preK)
+
+            #preK = diag_prec(Kfree).dinv  # Preconditioned Kfree
+
+            #print("Kfree.shape: {0}".format(Kfree.shape))
+            #print("self.rfree.shape: {0}".format(self.rfree.shape))
+            #print("preK.shape: {0}".format(preK.shape))
+
+
+            self.dfree, info = spla.isolve.cg(Kfree, self.rfree, tol=1e-08, maxiter=8000)#, M=preK)
             if info < 0:
-                Logger.display('PySparse error: Type:', info,', at', numitr, \
-                    'iterations.')
+                Logger.display('PySparse error: Type: {0}'.format(info))
                 raise Exception('Solution for FEA did not converge.')
             else:
-                Logger.display('ToPy: Solution for FEA converged after', numitr, \
-                    'iterations.')
+                Logger.display('ToPy: Solution for FEA converged.')
             if self.probtype == 'mech':  # mechanism synthesis
-                (info, numitr, relerr) = \
-                itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, \
-                    8000, preK)
+                #(info, numitr, relerr) = \
+                #itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, \
+                    #8000, preK)
+
+                self.dfreeout, info = spla.isolve.cg(Kfree, self.rfreeout, tol=1e-08, maxiter=8000)#, M=preK)
                 if info < 0:
-                    Logger.display('PySparse error: Type:', info,', at', numitr, \
-                        'iterations.')
+                    Logger.display('PySparse error: Type: {0}'.format(info))
                     raise Exception('Solution for FEA of adjoint load case \
                         did not converge.')
 
@@ -332,10 +357,10 @@ class Topology:
         rmin = int(np.floor(self.filtrad))
         if self.nelz == 0:
             U, V = np.indices((self.nelx, self.nely))
-            for i in xrange(self.nelx):
+            for i in range(self.nelx):
                 umin = np.maximum(i - rmin - 1, 0)
                 umax = np.minimum(i + rmin + 2, self.nelx + 1)
-                for j in xrange(self.nely):
+                for j in range(self.nely):
                     vmin = np.maximum(j - rmin - 1, 0)
                     vmax = np.minimum(j + rmin + 2, self.nely + 1)
                     u = U[umin: umax, vmin: vmax]
@@ -348,13 +373,13 @@ class Topology:
         else:
             rmin3 = rmin
             U, V, W = np.indices((self.nelx, self.nely, self.nelz))
-            for i in xrange(self.nelx):
+            for i in range(self.nelx):
                 umin, umax = np.maximum(i - rmin - 1, 0),\
                              np.minimum(i + rmin + 2, self.nelx + 1)
-                for j in xrange(self.nely):
+                for j in range(self.nely):
                     vmin, vmax = np.maximum(j - rmin - 1, 0),\
                                  np.minimum(j + rmin + 2, self.nely + 1)
-                    for k in xrange(self.nelz):
+                    for k in range(self.nelz):
                         wmin, wmax = np.maximum(k - rmin3 - 1, 0),\
                                      np.minimum(k + rmin3 + 2, self.nelz + 1)
                         u = U[umin:umax, vmin:vmax, wmin:wmax]
@@ -373,7 +398,7 @@ class Topology:
     def sens_analysis(self):
         """
         Determine the objective function value and perform sensitivity analysis
-        (find the derivatives of objective function). 
+        (find the derivatives of objective function).
 
         EXAMPLES:
             >>> t.sens_analysis()
@@ -385,10 +410,10 @@ class Topology:
             raise Exception('You must first load a TPD file!')
         tmp = self.df.copy()
         self.objfval  = 0.0 #  Objective function value
-        
+
         # Prepare Supporting Variables
         if self.nelz == 0: #  2D problem
-    
+
             Y, X = np.indices((self.nely, self.nelx))
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1,1), axis=1)
             e2sdofmap = np.add(e2sdofmap, self.dofpn * (Y + X * (self.nely + 1)))
@@ -396,9 +421,9 @@ class Topology:
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe, 2, 1).T
             QeKQe = np.einsum('mnk,mnk->mn', QeK, Qe_T)
-            
+
         else: #  3D problem
-            
+
             Z, Y, X = np.indices((self.nelz, self.nely, self.nelx))
             X *= (self.nely + 1)
             Z *= (self.nelx + 1) * (self.nely + 1)
@@ -408,7 +433,7 @@ class Topology:
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe.T, 2, 0)
             QeKQe = np.einsum('klmn,klmn->klm', QeK, Qe_T)
-        
+
         # Update TMP
         if self.probtype == 'comp':
             self.objfval += ((self.desvars ** self.p) * QeKQe).sum()
@@ -423,7 +448,7 @@ class Topology:
         elif self.probtype == 'mech':
             self.objfval = self.d[self.loaddofout].sum()
             tmp = self.p * self.desvars ** (self.p - 1)
-            
+
             if self.nelz == 0:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap], 2, 1).T
                 op = np.einsum('mnk,mnk->mn', QeK, QeOut_T)
@@ -431,8 +456,8 @@ class Topology:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap].T, 2, 0)
                 op = np.einsum('klmn,klmn->klm', QeK, QeOut_T)
             tmp *= op
-            
-            
+
+
         self.df = tmp
 
 
@@ -573,8 +598,8 @@ class Topology:
 
         """
         if self.nelz == 0: #  2D problem
-            for elx in xrange(self.nelx):
-                for ely in xrange(self.nely):
+            for elx in range(self.nelx):
+                for ely in range(self.nely):
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
                     (ely + elx * (self.nely + 1))
                     if self.probtype == 'comp' or self.probtype == 'mech':
@@ -583,11 +608,15 @@ class Topology:
                         updatedKe = (VOID + (1 - VOID) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
-                    K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+
+                    #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                    K = update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
+
         else: #  3D problem
-            for elz in xrange(self.nelz):
-                for elx in xrange(self.nelx):
-                    for ely in xrange(self.nely):
+            for elz in range(self.nelz):
+                for elx in range(self.nelx):
+                    for ely in range(self.nely):
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (ely + elx * (self.nely + 1) + elz *\
                                     (self.nelx + 1) * (self.nely + 1))
@@ -598,10 +627,42 @@ class Topology:
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
-                        K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
 
-        K.delete_rowcols(self._rcfixed) #  Del constrained rows and columns
+                        #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                        K = update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
+
+        #K.delete_rowcols(self._rcfixed) #  Del constrained rows and columns
+
+        #from pprint import pprint
+
+        #print("sum(self._rcfixed): {0}".format(sum(self._rcfixed)))
+        #print("sum(1-self._rcfixed): {0}".format(sum(1-self._rcfixed)))
+        #print("len(self._rcfixed): {0}".format(len(self._rcfixed)))
+        #print("K.shape: {0}".format(K.shape))
+
+        J = identity_minus_rows(K.shape[0], self._rcfixed)
+        #for i in self._rcfixed:
+            ##print(self._rcfixed.T)
+            #print(i)
+        #print("J: {0}".format(J))
+        #print("J.shape: {0}".format(J.shape))
+
+        K = J*K*J.T
+        #K = numpy.delete(K, self._rcfixed, axis=0)
+        #K = numpy.delete(K, self._rcfixed, axis=1)
         return K
 
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## Jacobi-prconditioner:
+class diag_prec:
+      def __init__(self, A):
+          self.shape = A.shape
+          n = self.shape[0]
+          self.dinv = np.empty(n)
+          for i in range(n):
+              self.dinv[i] = 1.0 / A[i,i]
+      def precon(self, x, y):
+          np.multiply(x, self.dinv, y)
 
 # EOF topology.py

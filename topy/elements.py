@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Finite element stiffness matrices.
 #
@@ -10,6 +11,7 @@
 """
 
 from __future__ import division
+from __future__ import print_function
 
 from os import path
 
@@ -40,11 +42,11 @@ pth = path.join(path.split(__file__)[0], 'data')
 fname = path.join(pth, 'Q4bar.K')
 try:
     Q4bar = load(fname)
-except IOError:
-    print 'It seems as though all or some of the element stiffness matrices'
-    print 'do not exist. Creating them...'
-    print 'This is usually only required once and may take a few minutes.'
-    from topy.data import Q4bar_K
+except (IOError, FileNotFoundError):
+    print('It seems as though all or some of the element stiffness matrices')
+    print('do not exist. Creating them...')
+    print('This is usually only required once and may take a few minutes.')
+    from .data import Q4bar_K
     Q4bar = load(fname)
 
 # ==========================================================================
@@ -54,7 +56,7 @@ fname = path.join(pth, 'Q4.K')
 try:
     Q4 = load(fname)
 except IOError:
-    from topy.data import Q4_K
+    from .data import Q4_K
     Q4 = load(fname)
 
 # =========================================================================
@@ -64,7 +66,7 @@ fname = path.join(pth, 'Q5B.K')
 try:
     Q5B = load(fname)
 except IOError:
-    from topy.data import Q5B_K
+    from .data import Q5B_K
     Q5B = load(fname)
 
 # =========================================================
@@ -74,7 +76,7 @@ fname = path.join(pth, 'Q4T.K')
 try:
     Q4T = load(fname)
 except IOError:
-    from topy.data import Q4T_K
+    from .data import Q4T_K
     Q4T = load(fname)
 
 # ===========================================================
@@ -99,7 +101,7 @@ fname = path.join(pth, 'H8.K')
 try:
     H8 = load(fname)
 except IOError:
-    from topy.data import H8_K
+    from .data import H8_K
     H8 = load(fname)
 
 # ============================================================
@@ -109,7 +111,7 @@ fname = path.join(pth, 'H18B.K')
 try:
     H18B = load(fname)
 except IOError:
-    from topy.data import H18B_K
+    from .data import H18B_K
     H18B = load(fname)
 
 # ==========================================================================
@@ -120,7 +122,7 @@ fname = path.join(pth, 'H8T.K')
 try:
     H8T = load(fname)
 except IOError:
-    from topy.data import H8T_K
+    from .data import H8T_K
     H8T = load(fname)
 
 # EOF elements.py
