@@ -215,7 +215,7 @@ def _parse_dict(d):
     # they are not specified in the ToPy problem definition file:
     Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
     (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint for PySparse
-    d['K'] = sp_sparse.lil_matrix( (Ksize, Ksize) ) #  Global stiffness matrix
+    d['K'] = sp_sparse.coo_matrix( (Ksize, Ksize) ) #  Global stiffness matrix
     #print(Ksize)
     #d['K'] = np.zeros( (Ksize, Ksize) ) #  Global stiffness matrix
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \

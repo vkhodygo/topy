@@ -14,6 +14,7 @@ import numpy as np
 import os
 #from pysparse import superlu, itsolvers, precon
 import scipy.sparse.linalg as spla
+import scipy.sparse as sp_sparse
 from .parser import tpd_file2dict, config2dict
 from .topy_logging import Logger
 
@@ -597,11 +598,20 @@ class Topology:
         Return unconstrained stiffness matrix.
 
         """
-        if self.nelz == 0: #  2D problem
         ########################################################################
         ## Assembly of global stiffnes matrix as sum of local stiffnes matrixes
         ## ToDo: betterway of assembly, this loop must be parallized for speed 
         ##       improvements
+        ##
+        ########################################################################
+        ## assembly approach from:
+        ## http://milamin.sourceforge.net/technical-notes/sparse-matrix-assembly
+        ##
+        data  = []
+        i_vec = []
+        j_vec = []
+        
+        if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
@@ -611,10 +621,10 @@ class Topology:
                     elif self.probtype == 'heat':
                         updatedKe = (VOID + (1 - VOID) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
-                    # mask = np.ones(e2sdofmap.size, dtype=int)
-
-                    #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
-                    K = update_add_mask_sym(K, updatedKe, e2sdofmap)
+                        
+                    data  += updatedKe.reshape(updatedKe.size).tolist()
+                    i_vec += e2sdofmap.tolist() * e2sdofmap.size
+                    j_vec += np.repeat(e2sdofmap, e2sdofmap.size).tolist()
 
 
         else: #  3D problem
@@ -630,31 +640,16 @@ class Topology:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
-                        # mask = np.ones(e2sdofmap.size, dtype=int)
+                            
+                        data  += updatedKe.reshape(updatedKe.size).tolist()
+                        i_vec += e2sdofmap.tolist() * e2sdofmap.size
+                        j_vec += np.repeat(e2sdofmap, e2sdofmap.size).tolist()
 
-                        #K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
-                        K = update_add_mask_sym(K, updatedKe, e2sdofmap)
-
-
-        #K.delete_rowcols(self._rcfixed) #  Del constrained rows and columns
-
-        #from pprint import pprint
-
-        #print("sum(self._rcfixed): {0}".format(sum(self._rcfixed)))
-        #print("sum(1-self._rcfixed): {0}".format(sum(1-self._rcfixed)))
-        #print("len(self._rcfixed): {0}".format(len(self._rcfixed)))
-        #print("K.shape: {0}".format(K.shape))
+        K = sp_sparse.coo_matrix((data, (i_vec,j_vec)), shape=K.shape)
 
         J = identity_minus_rows(K.shape[0], self._rcfixed)
-        #for i in self._rcfixed:
-            ##print(self._rcfixed.T)
-            #print(i)
-        #print("J: {0}".format(J))
-        #print("J.shape: {0}".format(J.shape))
 
         K = J*K*J.T
-        #K = numpy.delete(K, self._rcfixed, axis=0)
-        #K = numpy.delete(K, self._rcfixed, axis=1)
         return K
 
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
