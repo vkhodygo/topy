@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Write the stiffness matrix of finite element to file. The created file name
 # is equal to the string between the underscores of *this* file's name, plus a
@@ -14,19 +15,23 @@
 """
 
 from __future__ import division
+from __future__ import print_function
 
 from sympy import symbols, Matrix, diff, integrate, zeros
 
 from numpy import abs, array
 
-from matlcons import *
+from .matlcons import *
+from ..helper_functions import my_map
 
 # Get file name:
 fname = __file__.split('_')[0] + '.K'
+fname = __file__[:-5] + '.K'
+print("working on filename: {0}".format(fname))
 
 try:
     f = open(fname)
-    print fname ,'(stiffness matrix) exists!'
+    print('{0} (stiffness matrix) exists!'.format(fname))
     f.close()
 except IOError:
     # SymPy symbols:
@@ -44,8 +49,8 @@ except IOError:
     N4 = (a - x) * (b + y) / (4 * a * b)
 
     # Create strain-displacement matrix B:
-    B0 = map(diff, [N1, N2, N3, N4], xlist)
-    B1 = map(diff, [N1, N2, N3, N4], ylist)
+    B0 = my_map(diff, [N1, N2, N3, N4], xlist)
+    B1 = my_map(diff, [N1, N2, N3, N4], ylist)
     B = Matrix([B0, B1])
 
     # Create conductivity matrix:
@@ -55,7 +60,7 @@ except IOError:
     dK = B.T * C * B
 
     # Integration:
-    print 'SymPy is integrating: K for Q4T...'
+    print('SymPy is integrating: K for Q4T...')
     K = dK.integrate((x, -a, a),(y, -b, b))
 
     # Convert SymPy Matrix to NumPy array:
@@ -66,6 +71,6 @@ except IOError:
 
     # Create file:
     K.dump(fname)
-    print 'Created', fname, '(stiffness matrix).'
+    print('Created {0} (stiffness matrix).'.format(fname))
 
 # EOF Q4T_K.py
