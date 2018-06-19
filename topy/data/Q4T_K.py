@@ -13,13 +13,13 @@
 # =============================================================================
 """
 
-from __future__ import division
+
 import os
 from sympy import symbols, Matrix, diff, integrate, zeros
 
 from numpy import abs, array
 
-from matlcons import *
+from .matlcons import *
 import logging
 logger = logging.getLogger(__name__)
 # Get file name:
@@ -43,8 +43,8 @@ else:
     N4 = (a - x) * (b + y) / (4 * a * b)
 
     # Create strain-displacement matrix B:
-    B0 = map(diff, [N1, N2, N3, N4], xlist)
-    B1 = map(diff, [N1, N2, N3, N4], ylist)
+    B0 = list(map(diff, [N1, N2, N3, N4], xlist))
+    B1 = list(map(diff, [N1, N2, N3, N4], ylist))
     B = Matrix([B0, B1])
 
     # Create conductivity matrix:

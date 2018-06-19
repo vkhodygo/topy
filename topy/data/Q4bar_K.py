@@ -13,13 +13,13 @@
 # =============================================================================
 """
 
-from __future__ import division
+
 import os
 from sympy import symbols, Matrix, diff, integrate, zeros
 
 from numpy import abs, array
 
-from matlcons import *
+from .matlcons import *
 import logging
 logger = logging.getLogger(__name__)
 # Get file name:
@@ -43,9 +43,9 @@ else:
     N4 = (a - x) * (b + y) / (4 * a * b)
 
     # Create strain-displacement matrix B:
-    B0 = map(diff, [N1, 0, N2, 0, N3, 0, N4, 0], xlist)
-    B1 = map(diff, [0, N1, 0, N2, 0, N3, 0, N4], ylist)
-    B2 = map(diff, [N1, N1, N2, N2, N3, N3, N4, N4], yxlist)
+    B0 = list(map(diff, [N1, 0, N2, 0, N3, 0, N4, 0], xlist))
+    B1 = list(map(diff, [0, N1, 0, N2, 0, N3, 0, N4], ylist))
+    B2 = list(map(diff, [N1, N1, N2, N2, N3, N3, N4, N4], yxlist))
     B = Matrix([B0, B1, B2])
 
     # Create constitutive (material property) matrix for plane stress:
@@ -56,12 +56,12 @@ else:
     CB = C * B
 
     # Create delB matrix:
-    delCB0x = array(map(diff, CB[0, :], xlist))
-    delCB0y = array(map(diff, CB[2, :], ylist))
+    delCB0x = array(list(map(diff, CB[0, :], xlist)))
+    delCB0y = array(list(map(diff, CB[2, :], ylist)))
     delCB0 = delCB0x + delCB0y
 
-    delCB1y = array(map(diff, CB[1, :], ylist))
-    delCB1x = array(map(diff, CB[2, :], xlist))
+    delCB1y = array(list(map(diff, CB[1, :], ylist)))
+    delCB1x = array(list(map(diff, CB[2, :], xlist)))
     delCB1 = delCB1y + delCB1x
 
     Bbar = Matrix([delCB0.tolist(), delCB1.tolist()])
