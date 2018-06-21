@@ -7,9 +7,10 @@
 # =============================================================================
 """
 import logging
-from string import lower
 import numpy as np
-from pysparse import spmatrix
+import scipy.sparse
+
+from .elements import *
 
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ def _parse_dict(d):
     # Read/convert minimum required input and convert, else exit:
     d = d.copy()
     try:
-        d['PROB_TYPE'] = lower(d['PROB_TYPE'])
+        d['PROB_TYPE'] = str.lower(d['PROB_TYPE'])
         d['VOL_FRAC'] = float(d['VOL_FRAC'])
         d['FILT_RAD'] = float(d['FILT_RAD'])
         d['P_FAC'] = float(d['P_FAC'])
@@ -113,7 +114,7 @@ def _parse_dict(d):
         d['NUM_ELEM_Y'] = int(d['NUM_ELEM_Y'])
         d['NUM_ELEM_Z'] = int(d['NUM_ELEM_Z'])
         d['DOF_PN'] = int(d['DOF_PN'])
-        d['ETA'] = lower(str(d['ETA']))
+        d['ETA'] = str.lower(str(d['ETA']))
         d['ELEM_TYPE'] = d['ELEM_K']
         d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
@@ -169,7 +170,7 @@ def _parse_dict(d):
 
     # Check if diagonal quadratic approximation is required:
     try:
-        d['APPROX'] = lower(d['APPROX'])
+        d['APPROX'] = str.lower(d['APPROX'])
     except KeyError:
         pass
 
@@ -209,7 +210,7 @@ def _parse_dict(d):
              (d['NUM_ELEM_X'] + 1) *
              (d['NUM_ELEM_Y'] + 1) *
              (d['NUM_ELEM_Z'] + 1))  # Memory allocation hint for PySparse
-    d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize)  # Global stiffness matrix
+    d['K'] = scipy.sparse.lil_matrix((Ksize, Ksize))  # Global stiffness matrix
     d['E2SDOFMAPI'] = _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'],
                                      d['DOF_PN'])  # Initial element to structure DOF mapping
     return d

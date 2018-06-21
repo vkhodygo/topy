@@ -9,10 +9,10 @@
 """
 
 import logging
-from string import lower
 import numpy as np
-from pysparse import superlu, itsolvers, precon
+import scipy.sparse.linalg
 from .parser import tpd_file2dict, config2dict
+from .helper_functions import identity_minus_rows, update_add_mask_sym
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ class Topology:
             logger.info('Damping factor (ETA) = %3.2f' % (self.eta.mean()))
 
         try:
-            self.approx = lower(self.topydict['APPROX'])
+            self.approx = str.lower(self.topydict['APPROX'])
         except KeyError:
             self.approx = None
         if self.approx == 'dquad':
@@ -276,28 +276,29 @@ class Topology:
 
         if self.dofpn < 3 and self.nelz == 0:  # Direct solver
             Kfree = Kfree.to_csr()  # Need CSR for SuperLU factorisation
-            lu = superlu.factorize(Kfree)
-            lu.solve(self.rfree, self.dfree)
+            #lu = superlu.factorize(Kfree)
+            #lu.solve(self.rfree, self.dfree)
+            lu = scipy.sparse.linalg.splu(Kfree)
+            self.dfree = lu.solve(self.rfree)
             if self.probtype == 'mech':
-                lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+                #lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+                self.dfreeout = lu.solve(self.rfreeout)
         else:  # Iterative solver for 3D problems
-            Kfree = Kfree.to_sss()
-            preK = precon.ssor(Kfree)  # Preconditioned Kfree
-            (info, numitr, relerr) = itsolvers.pcg(Kfree, self.rfree, self.dfree, 1e-8, 8000, preK)
+            #Kfree = Kfree.to_sss()
+            #preK = precon.ssor(Kfree)  # Preconditioned Kfree
+            #(info, numitr, relerr) = itsolvers.pcg(Kfree, self.rfree, self.dfree, 1e-8, 8000, preK)
+            self.dfree, info = scipy.sparse.linalg.isolve.cg(Kfree, self.rfree, tol=1e-08, maxiter=8000)#, M=preK)
             if info < 0:
-                logger.error('PySparse error: Type: {}, '
-                             'at {} iterations'.format(info, numitr))
+                logger.error('PySparse error: Type: {}'.format(info))
                 raise Exception('Solution for FEA did not converge.')
             else:
-                logger.debug('ToPy: Solution for FEA converged after '
-                             '{} iterations'.format(numitr))
+                logger.debug('ToPy: Solution for FEA converged.')
             if self.probtype == 'mech':  # mechanism synthesis
-                (info, numitr, relerr) = itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, 8000, preK)
+                #(info, numitr, relerr) = itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, 8000, preK)
+                self.dfreeout, info = scipy.sparse.linalg.isolve.cg(Kfree, self.rfreeout, tol=1e-08, maxiter=8000)#, M=preK)
                 if info < 0:
-                    logger.error('PySparse error: Type: {}, '
-                                 'at {} iterations'.format(info, numitr))
-                    raise Exception('Solution for FEA of adjoint load '
-                                    'case did not converge.')
+                    logger.error('PySparse error: Type: {}'.format(info))
+                    raise Exception('Solution for FEA of adjoint load case did not converge.')
 
         # Update displacement vectors:
         self.d[self.freedof] = self.dfree
@@ -566,7 +567,7 @@ class Topology:
                     elif self.probtype == 'heat':
                         updatedKe = (VOID + (1 - VOID) * self.desvars[ely, elx] ** self.p) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
-                    K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                    K = update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
         else:  # 3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
@@ -577,8 +578,10 @@ class Topology:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * self.desvars[elz, ely, elx] ** self.p) * self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
-                        K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                        K = update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
 
-        K.delete_rowcols(self._rcfixed)  # Del constrained rows and columns
+        #K.delete_rowcols(self._rcfixed)  # Del constrained rows and columns
+        J = identity_minus_rows(K.shape[0], self._rcfixed)
+        K = J*K*J.T
         return K
 # EOF topology.py

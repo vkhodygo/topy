@@ -21,13 +21,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['Q4', 'Q5B', 'Q4a5B', 'Q4T', 'H8', 'H18B', 'H8T']
 
-# ===================================================
-# === Messages used for errors, information, etc. ===
-# ===================================================
-MSG0 = 'finite element stiffness matrix.'
-
-MSG1 = 'Element stiffness matrices does not exist.\n Created... Please re-run \
-your last attempt.'
 
 # Set path to data folder:
 pth = path.join(path.split(__file__)[0], 'data')
@@ -40,7 +33,7 @@ pth = path.join(path.split(__file__)[0], 'data')
 fname = path.join(pth, 'Q4bar.K')
 try:
     Q4bar = load(fname)
-except IOError:
+except (IOError, FileNotFoundError):
     logger.info('It seems as though all or some of the element stiffness matrices')
     logger.info('do not exist. Creating them...')
     logger.info('This is usually only required once and may take a few minutes.')

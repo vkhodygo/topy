@@ -21,7 +21,7 @@ from sympy import symbols, Matrix, diff, integrate, zeros, eye
 from numpy import abs, array, transpose, dot
 from numpy.linalg import inv
 
-from .matlcons import *
+from matlcons import *
 
 logger = logging.getLogger(__name__)
 # Get file name:

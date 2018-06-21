@@ -6,14 +6,12 @@
 # Copyright (C) 2008, 2015, 2016, 2017 William Hunter.
 # =============================================================================
 """
-
-
-
 import sys
 from datetime import datetime
-from pylab import axis, close, cm, figure, imshow, savefig, title
-from numpy import arange, asarray, hstack
+import matplotlib.pyplot as plt
+import numpy as np
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
+
 
 __all__ = ['create_2d_imag', 'create_3d_geom', 'node_nums_2d', 'node_nums_3d',
            'create_2d_msh', 'create_3d_msh']
@@ -54,12 +52,12 @@ def create_2d_imag(x, **kwargs):
     # === Start of Matplotlib commands ===
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
-    figure()  # open a figure
+    plt.figure()  # open a figure
     if 'title' in kwargs:
-        title(kwargs['title'])
-        imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    axis('off')
+        plt.title(kwargs['title'])
+        plt.imshow(-x, cmap=plt.cm.gray, aspect='equal', interpolation='nearest')
+    plt.imshow(-x, cmap=plt.cm.gray, aspect='equal', interpolation='nearest')
+    plt.axis('off')
     # ==================================
     # === End of Matplotlib commands ===
     # ==================================
@@ -71,8 +69,8 @@ def create_2d_imag(x, **kwargs):
     # Change the default filename based on keyword arguments, if necessary:
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as image:
-    savefig(fname, bbox_inches='tight')
-    close()  # close the figure
+    plt.savefig(fname, bbox_inches='tight')
+    plt.close()  # close the figure
 
 
 def create_3d_geom(x, **kwargs):
@@ -142,8 +140,8 @@ def create_2d_msh(nelx, nely, fname):
     # Total number of nodes in mesh
     nnodes = (nelx + 1) * (nely + 1)
     # x and y coordinates of elements
-    xcoords = arange(nelx + 1)
-    ycoords = - arange(nely + 1)
+    xcoords = np.arange(nelx + 1)
+    ycoords = - np.arange(nely + 1)
     # Total number of elements
     nelms = nelx * nely
 
@@ -165,7 +163,7 @@ def create_2d_msh(nelx, nely, fname):
         outputfile.write(MSH_elements[0])
         outputfile.write(str(nelms) + '\n')
         # elm-number elm-type number-of-tags < tag > ... node-number-list
-        for elem in arange(1, nelms + 1):
+        for elem in np.arange(1, nelms + 1):
             outputfile.write(str(elem) + ' 3 0 ')  # 3 is a 4-node quadrangle
             nn = node_nums_2d(nelx, nely, elem)
             outputfile.write(str(nn[0]) + ' ' + str(nn[1]) + ' ' + str(nn[3]) + ' ' + str(nn[2]) + '\n')
@@ -198,9 +196,9 @@ def create_3d_msh(nelx, nely, nelz, fname):
     # Total number of nodes in mesh
     nnodes = (nelx + 1) * (nely + 1) * (nelz + 1)
     # x, y and z coordinates of elements
-    xcoords = arange(nelx + 1)
-    ycoords = - arange(nely + 1)
-    zcoords = arange(nelz + 1)
+    xcoords = np.arange(nelx + 1)
+    ycoords = - np.arange(nely + 1)
+    zcoords = np.arange(nelz + 1)
     # Total number of elements
     nelms = nelx * nely * nelz
 
@@ -223,7 +221,7 @@ def create_3d_msh(nelx, nely, nelz, fname):
         outputfile.write(MSH_elements[0])
         outputfile.write(str(nelms) + '\n')
         # elm-number elm-type number-of-tags < tag > ... node-number-list
-        for elem in arange(1, nelms + 1):
+        for elem in np.arange(1, nelms + 1):
             outputfile.write(str(elem) + ' 5 0 ')  # 5 is a 8-node hexahedron
             nn = node_nums_3d(nelx, nely, nelz, elem)
             outputfile.write(str(nn[0]) + ' ' + str(nn[1]) + ' ' + str(nn[3]) + ' ' + str(nn[2]) + ' ' +
@@ -256,7 +254,7 @@ def node_nums_2d(nelx, nely, en):
     """
     if en > nelx * nely:
         raise Exception('Mesh does not contain specified element number.')
-    inn = asarray([0, 1, nely + 1, nely + 2])  # initial node numbers
+    inn = np.asarray([0, 1, nely + 1, nely + 2])  # initial node numbers
     nn = inn + (en + (en - 1) // nely)  # the element's node numbers
     return nn
 
@@ -298,7 +296,7 @@ def node_nums_3d(nelx, nely, nelz, en):
     zinc = (en - 1) // xygridsize * (nelx + 1) * (nely + 1)
     nnr = nnzero + zinc
     nnf = nnr + (nelx + 1) * (nely + 1)
-    nn = hstack((nnr, nnf))
+    nn = np.hstack((nnr, nnf))
     return nn
 
 
@@ -350,7 +348,7 @@ def _write_legacy_vtu(x, fname):
     THRESHOLD = 0.001
 
     # Voxel local points relative to its centre of geometry:
-    voxel_local_points = asarray([
+    voxel_local_points = np.asarray([
         [-1, -1, -1],
         [1, -1, -1],
         [-1, 1, -1],
@@ -377,7 +375,7 @@ def _write_legacy_vtu(x, fname):
                     xculled.append(x[i, j, k])
                     points += (voxel_local_points + [i, j, k]).tolist()
 
-    voxels = arange(len(points)).reshape(len(xculled), 8).tolist()
+    voxels = np.arange(len(points)).reshape(len(xculled), 8).tolist()
     topology = UnstructuredGrid(points, voxel=voxels)
     file_header = 'ToPy data, created ' + str(datetime.now()).rsplit('.')[0]
     scalars = CellData(Scalars(xculled, name='Densities', lookup_table='default'))

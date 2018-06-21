@@ -21,7 +21,7 @@ from sympy import symbols, Matrix, diff, integrate, zeros
 
 from numpy import abs, array
 
-from .matlcons import *
+from matlcons import *
 
 logger = logging.getLogger(__name__)
 # Get file name:
