@@ -1,18 +1,16 @@
-﻿"""
-# =============================================================================
+﻿# =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
 # conditions. Data is read from an input file, see 'examples' directory.
 #
 # Author: William Hunter
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
-"""
 
 import logging
 import numpy as np
 import scipy.sparse.linalg
-from .parser import tpd_file2dict, config2dict
-from .helper_functions import identity_minus_rows, update_add_mask_sym
+from parsertopy.py import tpd_file2dict, config2dict
+from helper_functions import identity_minus_rows, update_add_mask_sym
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +273,7 @@ class Topology:
         Kfree = self._updateK(self.K.copy())
 
         if self.dofpn < 3 and self.nelz == 0:  # Direct solver
-            Kfree = Kfree.to_csr()  # Need CSR for SuperLU factorisation
+            # Kfree = Kfree.to_csr()  # Need CSR for SuperLU factorisation
             #lu = superlu.factorize(Kfree)
             #lu.solve(self.rfree, self.dfree)
             lu = scipy.sparse.linalg.splu(Kfree)

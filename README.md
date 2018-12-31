@@ -1,26 +1,19 @@
 # ToPy
-<div align="center">
-	<img src="./imgsrc/ToPy_logo.png">
-</div>
+![](./imgsrc/ToPy_logo.png)
 
 ToPy is a lightweight topology optimization framework for Python that can solve
 compliance (stiffness), mechanism synthesis and heat conduction problems in 2D and 3D.
-Please refer to the [ToPy Wiki](https://github.com/williamhunter/topy/wiki) for further information.
-
-ToPy was originally hosted on Google Code.
+Please refer to the [ToPy Docs](docs/README.md) for further information.
 
 ## Installation
-Once you've downloaded the depenencies (see the [INSTALL](https://github.com/williamhunter/topy/blob/master/INSTALL.md)
+Once you've downloaded the depenencies (see the [INSTALL](docs/INSTALL.md)
 file) all you need to do is the following:
 
 ```bash
-$ git clone https://github.com/williamhunter/topy.git
+$ git clone https://github.com/thebeachlab/topy.git
 $ cd topy/topy
 $ python setup.py install
 ```
-
-Alternatively, you can download the latest stable release, but it usually lags
-a little behind the Master branch (as can be expected).
 
 ## Getting started
 The main class of **ToPy** is 'Topology'. It defines the main constraints,
@@ -29,7 +22,7 @@ yourself with this if you just want to get some results.
 
 ### There are two ways of defining a problem
 1. **TPD file**: You define the problem with keywords
-(see [Help](https://github.com/williamhunter/topy/wiki/Help)) in a simple text file and solve via the command line. The text file must have the extension `.tpd`
+(see [Help](docs/Help.md)) in a simple text file and solve via the command line. The text file must have the extension `.tpd`
 2. **Config dictionary**: This is similar to the TPD file approach, however,
 you define the problem directly in a Python file; it's very useful if you want to
 experiment and don't want to keep making changes to a text file.
@@ -55,7 +48,7 @@ FXTR_NODE_Y: 1281
 LOAD_NODE_Y: 1
 LOAD_VALU_Y: -1
 ```
-You can read more about successful problem definition [here](https://github.com/williamhunter/topy/tree/master/templates).
+You can read more about successful problem definition [here](./templates/).
 
 When the TPD file is defined, then the rest is simple:
 
@@ -131,10 +124,10 @@ convert -delay 35 *.png anim.gif
 </div>
 
 ## Tutorials
-[Tutorials](https://github.com/williamhunter/topy/wiki/Tutorials)
+[Tutorials](docs/Tutorials.md)
 
 ## Solved examples
-[Examples](https://github.com/williamhunter/topy/wiki/Examples)
+[Examples](docs/Examples-of-ToPy-results.md)
 
 ## How to cite ToPy
 If you've used ToPy in your research work, please consider to cite:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 # =============================================================================
 # Parse a ToPy problem definition (TPD) file to a Python dictionary.
 #
@@ -323,10 +323,8 @@ def _e2sdofmapinit(nelx, nely, dofpn):
         a = d + 3
         c = np.arange(3 * (nely + 1), 3 * (nely + 1) + 3)
         b = np.arange(3 * (nely + 2), 3 * (nely + 2) + 3)
-        h = np.arange(3 * (nelx + 1) * (nely + 1),
-                      3 * (nelx + 1) * (nely + 1) + 3)
-        e = np.arange(3 * ((nelx + 1) * (nely + 1) + 1),
-                      3 * ((nelx + 1) * (nely + 1) + 1) + 3)
+        h = np.arange(3 * (nelx + 1) * (nely + 1), 3 * (nelx + 1) * (nely + 1) + 3)
+        e = np.arange(3 * ((nelx + 1) * (nely + 1) + 1), 3 * ((nelx + 1) * (nely + 1) + 1) + 3)
         g = np.arange(3 * ((nelx + 1) * (nely + 1) + (nely + 1)),
                       3 * ((nelx + 1) * (nely + 1) + (nely + 1)) + 3)
         f = np.arange(3 * ((nelx + 1) * (nely + 1) + (nely + 2)),
@@ -343,16 +341,13 @@ def _checkparams(d):
 
     """
     if d['LOAD_DOF'].size != d['LOAD_VAL'].size:
-        raise ValueError(
-            'Load vector and load value vector lengths not equal.')
+        raise ValueError('Load vector and load value vector lengths not equal.')
     if d['LOAD_VAL'].size + d['LOAD_DOF'].size == 0:
         raise ValueError('No load(s) or no loaded node(s) specified.')
     # Check for rigid body motion and warn user:
     if d['DOF_PN'] == 2:
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d:
-            logger.info(
-                '\n\tToPy warning: Rigid body motion in 2D is possible!\n')
+            logger.info('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
     if d['DOF_PN'] == 3:
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d or 'FXTR_NODE_Z' not in d:
-            logger.info(
-                '\n\tToPy warning: Rigid body motion in 3D is possible!\n')
+            logger.info('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
