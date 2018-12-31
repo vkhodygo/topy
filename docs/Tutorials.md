@@ -1,10 +1,10 @@
+# Tutorials
+
 Please read through the list of ToPy Keywords on the
 [Help](Help.md) page,
 else the below is not going to make a lot of sense.
 
-The Tutorials build on each other, if you jump straight to, for example Tutorial 4, you will miss some steps on how to solve a problem.
-
-You will also need to install [Gmsh](http://gmsh.info).
+The Tutorials build on each other, if you jump straight to, for example Tutorial 3, you will miss some steps on how to solve a problem.
 
 # Typical workflow
 1. Conceptualize the problem (this can be done on a piece of paper)

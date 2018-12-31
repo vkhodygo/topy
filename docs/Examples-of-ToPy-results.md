@@ -91,6 +91,3 @@ Q_MAX      : 5  # max value of 'Q_CON'
 After 94 iterations, you should end up with a file named _mbb_beam_2d_reci_gsf_094.tpd_, that looks like this:
 
 ![MBB Beam solution with GSF](../imgsrc/f1b5e452-2cdf-11e6-9609-c556a22aa6c7.png)
-
-# I want to know more!
-Here is a short [Tutorial](Tutorials.md) on creating 2D problems.

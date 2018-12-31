@@ -1,121 +1,10 @@
-# ToPy
 ![](./imgsrc/ToPy_logo.png)
 
-ToPy is a lightweight topology optimization framework for Python that can solve
-compliance (stiffness), mechanism synthesis and heat conduction problems in 2D and 3D.
-Please refer to the [ToPy Docs](docs/README.md) for further information.
-
-## Installation
-Once you've downloaded the depenencies (see the [INSTALL](docs/INSTALL.md)
-file) all you need to do is the following:
-
-```bash
-$ git clone https://github.com/thebeachlab/topy.git
-$ cd topy/topy
-$ python setup.py install
-```
-
-## Getting started
-The main class of **ToPy** is 'Topology'. It defines the main constraints,
-grid and parameters of optimization -- but you don't really have to bother
-yourself with this if you just want to get some results.
-
-### There are two ways of defining a problem
-1. **TPD file**: You define the problem with keywords
-(see [Help](docs/Help.md)) in a simple text file and solve via the command line. The text file must have the extension `.tpd`
-2. **Config dictionary**: This is similar to the TPD file approach, however,
-you define the problem directly in a Python file; it's very useful if you want to
-experiment and don't want to keep making changes to a text file.
-You can later save the Config keywords to a TPD file.
-
-### TPD (**T**oPy **P**roblem **D**efinition) file
-There is a minimal set of parameters which is required for successful definition of a ToPy problem:
-```
-PROB_TYPE  : comp
-PROB_NAME  : mbb_beam_minimal
-ETA        : 0.5
-DOF_PN     : 2
-VOL_FRAC   : 0.5
-FILT_RAD   : 1.5
-P_FAC      : 3
-ELEM_K     : Q4
-NUM_ELEM_X : 60
-NUM_ELEM_Y : 20
-NUM_ELEM_Z : 0
-NUM_ITER   : 10
-FXTR_NODE_X: 1|21
-FXTR_NODE_Y: 1281
-LOAD_NODE_Y: 1
-LOAD_VALU_Y: -1
-```
-You can read more about successful problem definition [here](./templates/).
-
-When the TPD file is defined, then the rest is simple:
-
-```python
-from topy import Topology
-
-topology = Topology()
-topology.load_tpd_file('file.tpd')
-```
-
-### Config dictionary
-First you have to define a config dictionary (note the similarity with a TPD
-file, especially the keywords):
-
-```Python
-config = {
-     'DOF_PN': 2,
-     'ELEM_K': 'Q4',
-     'ETA': '0.5',
-     'FILT_RAD': 1.5,
-     'FXTR_NODE_X': range(1, 22),
-     'FXTR_NODE_Y': 1281,
-     'LOAD_NODE_Y': 1,
-     'LOAD_VALU_Y': -1,
-     'NUM_ELEM_X': 60,
-     'NUM_ELEM_Y': 20,
-     'NUM_ELEM_Z': 0,
-     'NUM_ITER': 94,
-     'PROB_NAME': 'beam_2d_reci',
-     'PROB_TYPE': 'comp',
-     'P_FAC': 3.0,
-     'VOL_FRAC': 0.5
-}
-```
-The requirements are the same as for the TPD file.
-
-```Python
-topology = Topology(config=config)
-```
-### Optimization (solving the problem)
-
-You can use the command line solution:
-
-```bash
-$ python topy/scripts/optimise.py <filename>.tpd
-```
-
-Or you can use a Python script:
-
-```Python
-import topy
-
-config = {...}
-t = topy.Topology(config)
-t.set_top_params()
-topy.optimise(t)
-```
-
-### Visualization (seeing the result)
-Module `topy.visualization` allows one to save the output as a `.png` image for 2D problems or as a `.vtk` file for 3D.
-The VTK files can be viewed with Mayavi or ParaView.
-You can animate the PNG images with
-the [convert](https://www.imagemagick.org/script/convert.php) tool.
-
-```bash
-convert -delay 35 *.png anim.gif
-```
+## What is ToPy?
+ToPy is short for **t**opology **o**ptimization using **Py**thon. It is a lightweight framework for Python that can solve one of three types of topology optimisation problems: 
+1. minimum compliance (same as maximum stiffness),
+2. heat conduction or
+3. mechanism design (synthesis).
 
 <div align="left">
 	<img src="./imgsrc/beam_2d_reci_gsf.gif" width=40%>
@@ -123,21 +12,40 @@ convert -delay 35 *.png anim.gif
 	<img src="./imgsrc/t-piece_2d_Q4_eta04_gsf.gif" width=20%>
 </div>
 
-## Tutorials
-[Tutorials](docs/Tutorials.md)
+A problem is defined (created) by means of a simple text input file, called a TPD file, which stands for ToPy Problem
+Definition.
 
-## Solved examples
-[Examples](docs/Examples-of-ToPy-results.md)
+ToPy solves the defined problem to obtain a 2D (or 3D, depending on the input file) checker-free black-white (in 2D) or solid-void (in 3D) solution. The result is
+1. an optimally stiff structure for minimum compliance (maximum stiffness) problems,
+2. an optimal distribution of two materials for heat conduction problems and
+3. an optimal distribution of material for efficient mobility.
 
-## How to cite ToPy
-If you've used ToPy in your research work, please consider to cite:
+The 2D results are PNG (or any format that Matplotlib can save) files and the 3D results are legacy VTK files.
+
+## Installation
+Install packages below via `pip` or by other means:
+1. NumPy+MKL
+2. SciPy
+3. matplotlib
+4. SymPy
+5. PyVTK
+
+You will also need to install [Gmsh](http://gmsh.info).
+
+Once you've downloaded the dependencies, all you need to do is the following:
+
+```bash
+$ git clone https://github.com/thebeachlab/topy.git
+$ cd topy/topy
+$ python setup.py install
 ```
-@misc{Hunter2007william,
-  author = {Hunter, William and others},
-  title = {ToPy - Topology optimization with Python},
-  year = {2017},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/williamhunter/topy}},
-  }
-```
+If there aren't any errors, then ToPy is installed. Congratulations!
+
+## Documentation
+Please refer to the [ToPy Docs](docs/README.md) for further information.
+
+## Limitations
+  * ToPy only works with regular square (for 2D)  and cubic (for 3D) meshes. Your mesh will therefore consist of perfectly square (for 2D) or perfectly cubic (for 3D) elements.
+  * No GUI for defining problems
+  * No CAD interface (although you can save the 3D files as STL files via ParaView)
+
