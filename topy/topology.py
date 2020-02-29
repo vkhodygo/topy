@@ -313,7 +313,7 @@ class Topology:
                 lu.solve((self.rfreeout, self.dfreeout))  # mechanism synthesis
         else:  #  Iterative solver for 3D problems
             Kfree = Kfree.to_csr()
-            preK = precondition_sparse_matrix(Kfree)  # Preconditioned Kfree
+            preK = utils.precondition_sparse_matrix(Kfree)  # Preconditioned Kfree
             (info, numitr, relerr) = linalg.cg(
                 Kfree, self.rfree, self.dfree, tol=1e-8, maxiter=8000, M=preK
             )

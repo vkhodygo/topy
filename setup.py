@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 ToPy install script.
 
 Install ToPy through `python setup.py install`.
 """
-
 import json
+
 import setuptools
 
 # Get metadata.
@@ -20,12 +21,20 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=["topy", "topy.data"],
-    install_requires=['typing', 'pathlib', 'matplotlib', 'sympy', 'numpy<=1.14', 'pyvtk', 'pysparse'],
+    install_requires=[
+        "typing",
+        "pathlib",
+        "matplotlib",
+        "sympy",
+        "numpy<=1.14",
+        "scipy",
+        "pyvtk",
+    ],
     classifiers=[
-        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='~=2.7',
+    python_requires=">=3",
     **metadata
 )

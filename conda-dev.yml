@@ -1,7 +1,5 @@
-name: mlaradji.topy.dev
+name: topy.dev
 channels:
-  - freecad/label/dev
-  - pytorch
   - conda-forge
   - defaults
 dependencies:
@@ -73,6 +71,7 @@ dependencies:
   - python=3.6.7=h357f687_1006
   - python-dateutil=2.8.1=py_0
   - pytz=2019.3=py_0
+  - pyvtk=0.5.18
   - qt=5.9.7=h52cfd70_2
   - readline=8.0=hf8c457e_0
   - regex=2020.2.20=py36h516909a_0
@@ -96,4 +95,3 @@ dependencies:
   - xz=5.2.4=h14c3975_1001
   - zipp=3.0.0=py_0
   - zlib=1.2.11=h516909a_1006
-prefix: /home/mohamed/.conda/miniconda3/envs/mlaradji.topy.dev

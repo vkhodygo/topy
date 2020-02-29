@@ -118,7 +118,7 @@ def _parse_dict(d):
         d["DOF_PN"] = int(d["DOF_PN"])
         d["ETA"] = str(d["ETA"]).lower()
         d["ELEM_TYPE"] = d["ELEM_K"]
-        d["ELEM_K"] = eval(d["ELEM_TYPE"])
+        d["ELEM_K"] = getattr(elements, d["ELEM_TYPE"])
     except:
         raise ValueError("One or more parameters incorrectly specified.")
 
@@ -186,7 +186,7 @@ def _parse_dict(d):
     z = d.get("FXTR_NODE_Z", "")
     d["FIX_DOF"] = _dofvec(x, y, z, dofpn)
 
-    x = d.get("LOAD_NOimport sysLU_X", "")
+    x = d.get("LOAD_VALU_X", "")
     y = d.get("LOAD_VALU_Y", "")
     z = d.get("LOAD_VALU_Z", "")
     d["LOAD_VAL"] = _valvec(x, y, z)
