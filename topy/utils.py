@@ -5,6 +5,8 @@ import logging
 import sys
 
 from datashape import dshape
+from scipy.sparse import lil_matrix
+from scipy.sparse import linalg
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -13,6 +15,11 @@ def get_logger(name: str) -> logging.Logger:
     logger.addHandler(logging.StreamHandler(sys.stdout))
     logger.setLevel(logging.DEBUG)
     return logger
+
+
+# ===================================
+# === Matrix methods and helpers ===
+# ===================================
 
 
 def update_add_mask_sym(
@@ -25,6 +32,12 @@ def update_add_mask_sym(
     """
     Assemble a symmetric global finite element matrix. Changes `A` in-place.
 
+    :param A: MxM matrix.
+    :param B: MxM matrix.
+    :param ind: Mx1 matrix.
+    :param mask: Mx1 matrix.
+    :returns: A matrix with the same dimensions as A and B.
+
     source: http://pysparse.sourceforge.net/spmatrix.html#spmatrix.ll_mat.update_add_mask_sym
     """
     for (i, ind_i), (j, ind_j) in itertools.product(enumerate(ind), repeat=2):
@@ -32,3 +45,10 @@ def update_add_mask_sym(
             A[ind_i, ind_j] += B[i, j]
 
     return A
+
+
+def precondition_sparse_matrix(A: lil_matrix) -> linalg.LinearOperator:
+    """Compute an approximate inverse of `A` using incomplete LU decomposition."""
+    ilu = linalg.spilu(A)
+    Mx = ilu.solve
+    return linalg.LinearOperator(A.shape, Mx)
