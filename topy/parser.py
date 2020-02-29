@@ -10,8 +10,7 @@
 import numpy as np
 from scipy.sparse import lil_matrix
 
-from . import elements
-from . import utils
+from . import elements, utils
 
 logger = utils.get_logger(__name__)
 
@@ -181,10 +180,10 @@ def _parse_dict(d):
     # vector.
     dofpn = d["DOF_PN"]
 
-    x = d.get("FXTR_NODE_X", "")
-    y = d.get("FXTR_NODE_Y", "")
-    z = d.get("FXTR_NODE_Z", "")
-    d["FIX_DOF"] = _dofvec(x, y, z, dofpn)
+    x = d.get("LOAD_NODE_X", "")
+    y = d.get("LOAD_NODE_Y", "")
+    z = d.get("LOAD_NODE_Z", "")
+    d["LOAD_DOF"] = _dofvec(x, y, z, dofpn)
 
     x = d.get("LOAD_VALU_X", "")
     y = d.get("LOAD_VALU_Y", "")
