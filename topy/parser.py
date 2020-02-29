@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ﻿"""
 # =============================================================================
 # Parse a ToPy problem definition (TPD) file to a Python dictionary.
@@ -6,20 +7,18 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-
 import numpy as np
-from pysparse import spmatrix
+from scipy.sparse import lil_matrix
 
-from .utils import get_logger
-from .elements import *
+from . import elements, utils
 
-logger = get_logger(__name__)
+logger = utils.get_logger(__name__)
 
 
 # ========================
 # === Public functions ===
 # ========================
-def tpd_file2dict(fname):
+def tpd_file2dict(fname: str) -> dict:
     """
     Read in *all* the parameters from a TPD file and return a dictionary.
 
@@ -43,13 +42,15 @@ def tpd_file2dict(fname):
     """
     with open(fname, 'r') as f:
         s = f.read()
+
     # Check for file version header, and parse:
-    if s.startswith('[ToPy Problem Definition File v2007]') != True:
+    if not s.startswith('[ToPy Problem Definition File v2007]'):
         raise Exception('Input file or format not recognised')
-    elif s.startswith('[ToPy Problem Definition File v2007]') == True:
-        d = _parsev2007file(s)
-        logger.info('ToPy problem definition (TPD) file successfully parsed.')
-        logger.info('TPD file name: {} (v2007)\n'.format(fname))
+
+    d = _parsev2007file(s)
+    logger.info('ToPy problem definition (TPD) file successfully parsed.')
+    logger.info('TPD file name: {} (v2007)\n'.format(fname))
+
     # Very basic parameter checking, exit on error:
     _checkparams(d)
     # Future file versions, enter <if> and <elif> as per above and define new
@@ -98,11 +99,11 @@ def _parsev2007file(s):
     snew = [line.replace(' ', '') for line in snew]
     snew = list(filter(len, snew))
 
-    d = dict([line.split(':') for line in snew]) 
+    d = dict([line.split(':') for line in snew])
     return _parse_dict(d)
 
 
- 
+
 
 def _parse_dict(d):
        # Read/convert minimum required input and convert, else exit:
@@ -211,7 +212,7 @@ def _parse_dict(d):
     # they are not specified in the ToPy problem definition file:
     Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
     (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint for PySparse
-    d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize) #  Global stiffness matrix
+    d["K"] = lil_matrix((Ksize, Ksize), dtype=float)  # Global stiffness matrix
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
     d['DOF_PN']) #  Initial element to structure DOF mapping
 
@@ -347,8 +348,7 @@ def _checkparams(d):
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d:
             logger.info('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
     if d['DOF_PN'] == 3:
-        if not d.has_key('FXTR_NODE_X') or not d.has_key('FXTR_NODE_Y')\
-        or not d.has_key('FXTR_NODE_Z'):
+        if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d or 'FXTR_NODE_Z' not in d:
             logger.info('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
 
 # EOF parser.py

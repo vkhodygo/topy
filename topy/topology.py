@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ﻿"""
 # =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
@@ -8,15 +9,21 @@
 # =============================================================================
 """
 import os
+import sys
 
 import numpy as np
-from pysparse import superlu, itsolvers, precon
+from scipy.sparse import lil_matrix, linalg
 
-from .utils import get_logger
-from .parser import tpd_file2dict, config2dict
+from .parser import config2dict, tpd_file2dict
+from .utils import get_logger, update_add_mask
+
+# Add Python3 compatibility.
+if sys.version_info.major > 2:
+    xrange = range
+
 
 logger = get_logger(__name__)
-logger.info("Instantiated.")
+
 __all__ = ['Topology']
 
 
@@ -39,8 +46,13 @@ class Topology:
     values. Data is read from an input file (see 'examples' folder).
 
     """
-    def __init__(self, config=None, topydict={}, pcount=0, 
+    def __init__(self, config=None, topydict=None, pcount=0,
                  qcount=0, itercount=0, change=1, svtfrac=None):
+
+        # `{}` is an unsafe default argument.
+        if topydict is None:
+            topydict = {}
+
         self.pcount = pcount #  Counter for continuation of p
         self.qcount = qcount #  Counter for continuation of q for GSF
         self.itercount = itercount #  Internal counter
@@ -252,11 +264,11 @@ class Topology:
             maskin = np.ones(self.loaddof.shape, dtype='int')
             maskout = np.ones(self.loaddofout.shape, dtype='int')
             if len(ksin) > 1:
-                self.K.update_add_mask_sym([ksin, ksin], self.loaddof, maskin)
-                self.K.update_add_mask_sym([ksout, ksout], self.loaddofout, maskout)
+                utils.update_add_mask_sym(self.K, [ksin, ksin], self.loaddof, maskin)
+                utils.update_add_mask_sym(self.K, [ksout, ksout], self.loaddofout, maskout)
             else:
-                self.K.update_add_mask_sym([ksin], self.loaddof, maskin)
-                self.K.update_add_mask_sym([ksout], self.loaddofout, maskout)
+                utils.update_add_mask_sym(self.K, [ksin], self.loaddof, maskin)
+                utils.update_add_mask_sym(self.K, [ksout], self.loaddofout, maskout)
 
     def fea(self):
         """
@@ -280,16 +292,16 @@ class Topology:
         Kfree = self._updateK(self.K.copy())
 
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
-            Kfree = Kfree.to_csr() #  Need CSR for SuperLU factorisation
-            lu = superlu.factorize(Kfree)
-            lu.solve(self.rfree, self.dfree)
+            Kfree = Kfree.tocsr() #  Need CSR for SuperLU factorisation
+            lu = linalg.splu(Kfree)
+            lu.solve((self.rfree, self.dfree))
             if self.probtype == 'mech':
-                lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+                lu.solve((self.rfreeout, self.dfreeout))  # mechanism synthesis
         else: #  Iterative solver for 3D problems
-            Kfree = Kfree.to_sss()
-            preK = precon.ssor(Kfree) #  Preconditioned Kfree
+            Kfree = Kfree.to_csr()
+            preK = precondition_sparse_matrix(Kfree)  # Preconditioned Kfree
             (info, numitr, relerr) = \
-            itsolvers.pcg(Kfree, self.rfree, self.dfree, 1e-8, 8000, preK)
+            linalg.cg(Kfree, self.rfree, self.dfree, tol=1e-8, maxiter=8000, M=preK)
             if info < 0:
                 logger.error('PySparse error: Type: {}, '
                              'at {} iterations'.format(info, numitr))
@@ -299,8 +311,7 @@ class Topology:
                              '{} iterations'.format(numitr))
             if self.probtype == 'mech':  # mechanism synthesis
                 (info, numitr, relerr) = \
-                itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, \
-                    8000, preK)
+                linalg.cg(Kfree, self.rfreeout, self.dfreeout, tol=1e-8, maxiter=8000, M=preK)
                 if info < 0:
                     logger.error('PySparse error: Type: {}, '
                                  'at {} iterations'.format(info, numitr))
@@ -372,7 +383,7 @@ class Topology:
     def sens_analysis(self):
         """
         Determine the objective function value and perform sensitivity analysis
-        (find the derivatives of objective function). 
+        (find the derivatives of objective function).
 
         EXAMPLES:
             >>> t.sens_analysis()
@@ -384,10 +395,10 @@ class Topology:
             raise Exception('You must first load a TPD file!')
         tmp = self.df.copy()
         self.objfval  = 0.0 #  Objective function value
-        
+
         # Prepare Supporting Variables
         if self.nelz == 0: #  2D problem
-    
+
             Y, X = np.indices((self.nely, self.nelx))
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1,1), axis=1)
             e2sdofmap = np.add(e2sdofmap, self.dofpn * (Y + X * (self.nely + 1)))
@@ -395,9 +406,9 @@ class Topology:
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe, 2, 1).T
             QeKQe = np.einsum('mnk,mnk->mn', QeK, Qe_T)
-            
+
         else: #  3D problem
-            
+
             Z, Y, X = np.indices((self.nelz, self.nely, self.nelx))
             X *= (self.nely + 1)
             Z *= (self.nelx + 1) * (self.nely + 1)
@@ -407,7 +418,7 @@ class Topology:
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe.T, 2, 0)
             QeKQe = np.einsum('klmn,klmn->klm', QeK, Qe_T)
-        
+
         # Update TMP
         if self.probtype == 'comp':
             self.objfval += ((self.desvars ** self.p) * QeKQe).sum()
@@ -422,7 +433,7 @@ class Topology:
         elif self.probtype == 'mech':
             self.objfval = self.d[self.loaddofout].sum()
             tmp = self.p * self.desvars ** (self.p - 1)
-            
+
             if self.nelz == 0:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap], 2, 1).T
                 op = np.einsum('mnk,mnk->mn', QeK, QeOut_T)
@@ -430,8 +441,8 @@ class Topology:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap].T, 2, 0)
                 op = np.einsum('klmn,klmn->klm', QeK, QeOut_T)
             tmp *= op
-            
-            
+
+
         self.df = tmp
 
 
@@ -564,12 +575,11 @@ class Topology:
     # ===================================
     # === Private methods and helpers ===
     # ===================================
-    def _updateK(self, K):
+    def _updateK(self, K: lil_matrix) -> lil_matrix:
         """
-        Update the global stiffness matrix by looking at each element's
-        contribution i.t.o. design domain density and the penalisation factor.
-        Return unconstrained stiffness matrix.
+        Update the global stiffness matrix by looking at each element's contribution i.t.o. design domain density and the penalisation factor.
 
+        :returns: unconstrained stiffness matrix.
         """
         if self.nelz == 0: #  2D problem
             for elx in xrange(self.nelx):
@@ -582,7 +592,7 @@ class Topology:
                         updatedKe = (VOID + (1 - VOID) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
-                    K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                    update_add_mask(K, updatedKe, e2sdofmap, mask, symmetric=True)
         else: #  3D problem
             for elz in xrange(self.nelz):
                 for elx in xrange(self.nelx):
@@ -597,10 +607,16 @@ class Topology:
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
-                        K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                        utils.update_add_mask_sym(K,updatedKe, e2sdofmap, mask)
 
         K.delete_rowcols(self._rcfixed) #  Del constrained rows and columns
         return K
+
+def precondition_sparse_matrix(A: lil_matrix) -> linalg.LinearOperator:
+    """Compute an approximate inverse of `A` using incomplete LU decomposition."""
+    ilu = linalg.spilu(A)
+    Mx = lambda x: ilu.solve(x)
+    return linalg.LinearOperator(A.shape, Mx)
 
 
 # EOF topology.py
