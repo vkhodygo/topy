@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 
+from __future__ import division
+
 from os import system, name
-import logging
-logger = logging.getLogger(__name__)
+
+from ..utils import get_logger
+
+logger = get_logger(__name__)
 
 if name == 'posix':
     system('rm Q4.K')
@@ -20,21 +24,21 @@ elif name == 'win32':
     system('del H8.K')
     system('del H8T.K')
     system('del H18B.K')
-
-logger.info('This may take a while, perhaps a few minutes...')
-system('python Q4_K.py')
-logger.info('1 of 7 done!')
-system('python Q4bar_K.py')
-logger.info('2 of 7 done!')
-system('python Q4T_K.py')
-logger.info('3 of 7 done!')
-system('python Q5B_K.py')
-logger.info('4 of 7 done! All 2D matrices created. Now 3D...')
-system('python H8_K.py')
-logger.info('5 of 7 done!')
-system('python H8T_K.py')
-logger.info('6 of 7 done!')
-system('python H18B_K.py')
-logger.info('7 of 7 done! All 3D matrices created. Finished.')
+else:
+    logger.info('This may take a while, perhaps a few minutes...')
+    system('python Q4_K.py')
+    logger.info('1 of 7 done!')
+    system('python Q4bar_K.py')
+    logger.info('2 of 7 done!')
+    system('python Q4T_K.py')
+    logger.info('3 of 7 done!')
+    system('python Q5B_K.py')
+    logger.info('4 of 7 done! All 2D matrices created. Now 3D...')
+    system('python H8_K.py')
+    logger.info('5 of 7 done!')
+    system('python H8T_K.py')
+    logger.info('6 of 7 done!')
+    system('python H18B_K.py')
+    logger.info('7 of 7 done! All 3D matrices created. Finished.')
 
 # EOF recreate_all.py
