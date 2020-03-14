@@ -22,7 +22,7 @@ repos:
       # - id: fix-encoding-pragma
       - id: name-tests-test
       - id: pretty-format-json
-        args: ["--autofix", "--indent 2"]
+        args: ["--autofix", "--indent=2"]
       - id: requirements-txt-fixer
       - id: sort-simple-yaml
       - id: trailing-whitespace
@@ -52,3 +52,10 @@ repos:
     rev: master # The version of Prospector to use, at least 1.1.7
     hooks:
       - id: prospector
+        additional_dependencies:
+          - prospector[with_mypy,with_bandit,with_pyroma]
+          - numpy
+          - scipy
+          - sympy
+          - pyvtk
+          - matplotlib

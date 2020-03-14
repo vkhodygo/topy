@@ -10,9 +10,8 @@
 import typing as tp
 
 import numpy as np
-import sksparse as sks
+import sksparse as sks  # pylint: disable-msg=import-error
 from scipy.sparse import linalg as sla
-
 from topy.parser import config2dict, tpd_file2dict
 from topy.utils import get_logger
 
@@ -530,7 +529,7 @@ class Topology:
             move = 0.1
         else:
             move = 0.2
-        lam1, lam2 = 0, 100e3
+        lam1, lam2 = 0.0, 100e3
         dims = self.desvars.shape
         while (lam2 - lam1) / (lam2 + lam1) > 1e-8 and lam2 > 1e-40:
             lammid = 0.5 * (lam1 + lam2)

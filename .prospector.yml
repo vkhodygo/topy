@@ -8,6 +8,12 @@ max-line-length: 160
 ignore-paths:
   - docs/
 
+bandit:
+  run: true
+
+pyflakes:
+  run: false
+
 frosted:
   run: false
 
