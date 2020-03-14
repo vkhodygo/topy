@@ -6,7 +6,7 @@ repos:
         args: ["--maxkb=1024"]
       - id: check-ast
       - id: check-builtin-literals
-      - id: check-byte-order-marker
+      # - id: check-byte-order-marker
       - id: check-docstring-first
       - id: check-executables-have-shebangs
       - id: check-json
@@ -19,7 +19,7 @@ repos:
       - id: debug-statements
       - id: detect-private-key
       - id: end-of-file-fixer
-      - id: fix-encoding-pragma
+      # - id: fix-encoding-pragma
       - id: name-tests-test
       - id: pretty-format-json
         args: ["--autofix", "--indent 2"]

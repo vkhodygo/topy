@@ -10,11 +10,11 @@
 import typing as tp
 
 import numpy as np
+import sksparse as sks
 from scipy.sparse import linalg as sla
-from scikits.sparse.cholmod import cholesky
 
+from topy.parser import config2dict, tpd_file2dict
 from topy.utils import get_logger
-from topy.parser import tpd_file2dict, config2dict
 
 logger = get_logger(__name__)
 logger.info("Instantiated.")
@@ -322,7 +322,7 @@ class Topology:
 
             # Sparse matrix to factorize should be in CSR or CSC format.
             Kfree = Kfree.tocsr()
-            preK = cholesky(Kfree)  #  Preconditioned Kfree
+            preK = sks.cholmod.cholesky(Kfree)  #  Preconditioned Kfree
             sla.lobpcg(
                 Kfree,
                 X=self.dfree,
