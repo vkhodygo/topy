@@ -6,9 +6,14 @@ verify_ssl = true
 [dev-packages]
 pre-commit = "*"
 black = "==19.10b0"
-prospector = {extras = ["with_mypy"],version = "*"}
+prospector = {extras = ["with_mypy", "with_pyroma"],version = "*"}
+pipenv = "*"
 
 [packages]
+numpy = "*"
+pyvtk = "*"
+scipy = "*"
+sympy = "*"
 
 [requires]
-python_version = "3.9"
+python_version = "3.8"

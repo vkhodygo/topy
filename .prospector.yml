@@ -1,0 +1,59 @@
+output-format: grouped
+
+strictness: veryhigh
+doc-warnings: true
+test-warnings: false
+max-line-length: 160
+
+ignore-paths:
+  - docs/
+
+frosted:
+  run: false
+
+mccabe:
+  run: false
+
+pyroma:
+  run: true
+
+mypy:
+  run: true
+  options:
+    follow-imports: true
+    ignore-missing-imports: false
+    warn-return-any: true
+    warn-unused-configs: true
+    disallow-untyped-defs: true
+    disallow-incomplete-defs: true
+
+pylint:
+  disable:
+    - invalid-name
+    - attribute-defined-outside-init
+    - too-many-locals
+    - too-many-branches
+    - too-many-statements
+    - too-many-arguments
+    - too-many-instance-attributes
+    - too-many-nested-blocks
+
+pep8:
+  full: true
+  disable:
+    - E262
+    - N802
+    - N803
+    - N806
+
+pep257:
+  disable:
+    - D107
+    - D203
+    - D205
+    - D212
+    - D400
+    - D405
+    - D406
+    - D407
+    - D415
