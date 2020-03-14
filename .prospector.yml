@@ -35,6 +35,7 @@ mypy:
 
 pylint:
   disable:
+    - line-too-long
     - invalid-name
     - attribute-defined-outside-init
     - too-many-locals
@@ -48,6 +49,7 @@ pep8:
   full: true
   disable:
     - E262
+    - E501
     - N802
     - N803
     - N806
@@ -62,4 +64,5 @@ pep257:
     - D405
     - D406
     - D407
+    - D413
     - D415
