@@ -14,6 +14,7 @@ numpy = "*"
 pyvtk = "*"
 scipy = "*"
 sympy = "*"
+scikit-sparse = "*"
 
 [requires]
 python_version = "3.8"
