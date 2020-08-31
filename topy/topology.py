@@ -10,7 +10,9 @@
 import os
 
 import numpy as np
-from pysparse import superlu, itsolvers, precon
+#from pysparse import superlu, itsolvers, precon
+from scipy import sparse
+from scipy.sparse import linalg
 
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
@@ -171,13 +173,13 @@ class Topology:
                 self.volfrac
         self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
-        self.r = np.zeros_like(self.alldof).astype(float) #  Load vector
+        self.r = np.zeros_like(self.alldof, dtype=np.float32) #  Load vector
         self.r[self.loaddof] = self.loadval #  Assign load values at loaded dof
         self.rfree = self.r[self.freedof] #  Modified load vector (free dof)
         self.d = np.zeros_like(self.r) #  Displacement vector
         self.dfree = np.zeros_like(self.rfree) #  Modified load vector (free dof)
         # Determine which rows and columns must be deleted from global K:
-        self._rcfixed = np.where(np.in1d(self.alldof, self.fixdof), 0, 1)
+        self._rcfixed = np.where(np.in1d(self.alldof, self.fixdof), False, True)
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
@@ -252,6 +254,7 @@ class Topology:
             maskin = np.ones(self.loaddof.shape, dtype='int')
             maskout = np.ones(self.loaddofout.shape, dtype='int')
             if len(ksin) > 1:
+                # USE EQUIVALENT PRESENT NEAR THE END OF FILE
                 self.K.update_add_mask_sym([ksin, ksin], self.loaddof, maskin)
                 self.K.update_add_mask_sym([ksout, ksout], self.loaddofout, maskout)
             else:
@@ -280,12 +283,18 @@ class Topology:
         Kfree = self._updateK(self.K.copy())
 
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
-            Kfree = Kfree.to_csr() #  Need CSR for SuperLU factorisation
-            lu = superlu.factorize(Kfree)
-            lu.solve(self.rfree, self.dfree)
+            # Kfree = Kfree.to_csr() #  Need CSR for SuperLU factorisation
+            # lu = superlu.factorize(Kfree)
+            # lu.solve(self.rfree, self.dfree)
+            # if self.probtype == 'mech':
+            #     lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+            Kfree = sparse.csc_matrix(Kfree)
+            lu = linalg.splu(Kfree)
+            self.dfree = lu.solve(self.rfree)
             if self.probtype == 'mech':
-                lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
+                self.dfreeout = lu.solve(self.rfreeout)
         else: #  Iterative solver for 3D problems
+            # NOT UPDATED TO PYTHON 3
             Kfree = Kfree.to_sss()
             preK = precon.ssor(Kfree) #  Preconditioned Kfree
             (info, numitr, relerr) = \
@@ -347,13 +356,13 @@ class Topology:
         else:
             rmin3 = rmin
             U, V, W = np.indices((self.nelx, self.nely, self.nelz))
-            for i in xrange(self.nelx):
+            for i in range(self.nelx):
                 umin, umax = np.maximum(i - rmin - 1, 0),\
                              np.minimum(i + rmin + 2, self.nelx + 1)
-                for j in xrange(self.nely):
+                for j in range(self.nely):
                     vmin, vmax = np.maximum(j - rmin - 1, 0),\
                                  np.minimum(j + rmin + 2, self.nely + 1)
-                    for k in xrange(self.nelz):
+                    for k in range(self.nelz):
                         wmin, wmax = np.maximum(k - rmin3 - 1, 0),\
                                      np.minimum(k + rmin3 + 2, self.nelz + 1)
                         u = U[umin:umax, vmin:vmax, wmin:wmax]
@@ -572,8 +581,8 @@ class Topology:
 
         """
         if self.nelz == 0: #  2D problem
-            for elx in xrange(self.nelx):
-                for ely in xrange(self.nely):
+            for elx in range(self.nelx):
+                for ely in range(self.nely):
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
                     (ely + elx * (self.nely + 1))
                     if self.probtype == 'comp' or self.probtype == 'mech':
@@ -582,11 +591,14 @@ class Topology:
                         updatedKe = (VOID + (1 - VOID) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
-                    K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                    for i in range(len(e2sdofmap)):
+                        for j in range(len(e2sdofmap)):
+                            if mask[i]:
+                               K[e2sdofmap[i],e2sdofmap[j]] += updatedKe[i,j]
         else: #  3D problem
-            for elz in xrange(self.nelz):
-                for elx in xrange(self.nelx):
-                    for ely in xrange(self.nely):
+            for elz in range(self.nelz):
+                for elx in range(self.nelx):
+                    for ely in range(self.nely):
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (ely + elx * (self.nely + 1) + elz *\
                                     (self.nelx + 1) * (self.nely + 1))
@@ -597,9 +609,15 @@ class Topology:
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
-                        K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                        for i in range(len(e2sdofmap)):
+                            for j in range(len(e2sdofmap)):
+                                if mask[i]:
+                                   K[e2sdofmap[i],e2sdofmap[j]] += updatedKe[i,j]
 
-        K.delete_rowcols(self._rcfixed) #  Del constrained rows and columns
+
+        # K.delete_rowcols(self._rcfixed) 
+        #  Del constrained rows and columns
+        K = K[self._rcfixed][:,self._rcfixed]
         return K
 
 

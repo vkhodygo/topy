@@ -8,7 +8,7 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-from os import path
+from os import path, system
 
 from numpy import array, linspace, unique, sqrt, round, load
 from numpy.linalg import eigvalsh
@@ -38,44 +38,48 @@ pth = path.join(path.split(__file__)[0], 'data')
 # === KBar of Q4, see De Klerk and Groenwold ===
 # ==============================================
 fname = path.join(pth, 'Q4bar.K')
-try:
-    Q4bar = load(fname)
-except IOError:
+if path.exists(fname):
+    Q4bar = load(fname, allow_pickle=True)
+else:
     logger.info('It seems as though all or some of the element stiffness matrices')
     logger.info('do not exist. Creating them...')
     logger.info('This is usually only required once and may take a few minutes.')
     from topy.data import Q4bar_K
-    Q4bar = load(fname)
+    Q4bar_K.create_file(fname)
+    Q4bar = load(fname, allow_pickle=True)
 
 # ==========================================================================
 # === Stiffness matrix of a square 4 node plane stress bi-linear element ===
 # ==========================================================================
 fname = path.join(pth, 'Q4.K')
-try:
-    Q4 = load(fname)
-except IOError:
+if path.exists(fname):
+    Q4 = load(fname, allow_pickle=True)
+else:
     from topy.data import Q4_K
-    Q4 = load(fname)
+    Q4_K.create_file(fname)
+    Q4 = load(fname, allow_pickle=True)
 
 # =========================================================================
 # === Stiffness matrix of a square 4 node plane stress '5-beta' element ===
 # =========================================================================
 fname = path.join(pth, 'Q5B.K')
-try:
-    Q5B = load(fname)
-except IOError:
+if path.exists(fname):
+    Q5B = load(fname, allow_pickle=True)
+else:
     from topy.data import Q5B_K
-    Q5B = load(fname)
+    Q5B_K.create_file(fname)
+    Q5B = load(fname, allow_pickle=True)
 
 # =========================================================
 # === Matrix for an element used in 2D thermal problems ===
 # =========================================================
 fname = path.join(pth, 'Q4T.K')
-try:
-    Q4T = load(fname)
-except IOError:
+if path.exists(fname):
+    Q4T = load(fname, allow_pickle=True)
+else:
     from topy.data import Q4T_K
-    Q4T = load(fname)
+    Q4T_K.create_file(fname)
+    Q4T = load(fname, allow_pickle=True)
 
 # ===========================================================
 # === Stiffness matrix of a square 4 node 'Q4a5B' element ===
@@ -96,31 +100,34 @@ Q4a5B = Q4 - alpha2D * _E * Q4bar  # stiffness matrix
 # === Stiffness matrix for a hexahedron 8 node tri-linear 3D element ===
 # ======================================================================
 fname = path.join(pth, 'H8.K')
-try:
-    H8 = load(fname)
-except IOError:
+if path.exists(fname):
+    H8 = load(fname, allow_pickle=True)
+else:
     from topy.data import H8_K
-    H8 = load(fname)
+    H8_K.create_file(fname)
+    H8 = load(fname, allow_pickle=True)
 
 # ============================================================
 # === Stiffness matrix of a cubic 8 node '18-beta' element ===
 # ============================================================
 fname = path.join(pth, 'H18B.K')
-try:
-    H18B = load(fname)
-except IOError:
+if path.exists(fname):
+    H18B = load(fname, allow_pickle=True)
+else:
     from topy.data import H18B_K
-    H18B = load(fname)
+    H18B_K.create_file(fname)
+    H18B = load(fname, allow_pickle=True)
 
 # ==========================================================================
 # === Stiffness matrix for a hexahedron 8 node tri-linear 3D element for ===
 # === thermal problems.                                                  ===
 # ==========================================================================
 fname = path.join(pth, 'H8T.K')
-try:
-    H8T = load(fname)
-except IOError:
+if path.exists(fname):
+    H8T = load(fname, allow_pickle=True)
+else:
     from topy.data import H8T_K
-    H8T = load(fname)
+    H8T_K.create_file(fname)
+    H8T = load(fname, allow_pickle=True)
 
 # EOF elements.py

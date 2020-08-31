@@ -65,10 +65,10 @@ def optimise(topology, save=True, dir='./iterations'):
     ti = time()
 
     # Try CHG_STOP criteria, if not defined (error), use NUM_ITER for iterations:
-    try:
+    if hasattr(topology, "chgstop"):
         while topology.change > topology.chgstop:
             _optimise(topology)
-    except AttributeError:
+    else:
         for i in range(topology.numiter):
             _optimise(topology)
     te = time()

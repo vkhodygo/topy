@@ -8,7 +8,8 @@
 """
 
 import numpy as np
-from pysparse import spmatrix
+#from pysparse import spmatrix
+from scipy import sparse
 
 from .utils import get_logger
 from .elements import *
@@ -211,7 +212,8 @@ def _parse_dict(d):
     # they are not specified in the ToPy problem definition file:
     Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
     (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint for PySparse
-    d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize) #  Global stiffness matrix
+    #d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize) #  Global stiffness matrix
+    d['K'] = sparse.dok_matrix((Ksize, Ksize), dtype=np.float32)
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
     d['DOF_PN']) #  Initial element to structure DOF mapping
 

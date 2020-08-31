@@ -59,7 +59,7 @@ def create_2d_imag(x, **kwargs):
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
     figure() # open a figure
-    if kwargs.has_key('title'):
+    if 'title' in kwargs:
         title(kwargs['title'])
         imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
     imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
