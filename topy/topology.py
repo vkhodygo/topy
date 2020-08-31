@@ -246,7 +246,7 @@ class Topology:
 
             self.rout = np.zeros_like(self.alldof).astype(float)
             self.rout[self.loaddofout] = self.loadvalout
-            self.rfreeout = self.rout[self.freedof]
+            self.rfreeout = np.array(self.rout[self.freedof], dtype=np.float32)
             self.dout = np.zeros_like(self.rout)
             self.dfreeout = np.zeros_like(self.rfreeout)
             ksin = np.ones(self.loaddof.shape, dtype='int') * KDATUM
@@ -254,12 +254,15 @@ class Topology:
             maskin = np.ones(self.loaddof.shape, dtype='int')
             maskout = np.ones(self.loaddofout.shape, dtype='int')
             if len(ksin) > 1:
-                # USE EQUIVALENT PRESENT NEAR THE END OF FILE
-                self.K.update_add_mask_sym([ksin, ksin], self.loaddof, maskin)
-                self.K.update_add_mask_sym([ksout, ksout], self.loaddofout, maskout)
+                # self.K.update_add_mask_sym([ksin, ksin], self.loaddof, maskin)
+                # self.K.update_add_mask_sym([ksout, ksout], self.loaddofout, maskout)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin, ksin]), self.loaddof, maskin)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout, ksout]), self.loaddofout, maskout)
             else:
-                self.K.update_add_mask_sym([ksin], self.loaddof, maskin)
-                self.K.update_add_mask_sym([ksout], self.loaddofout, maskout)
+                #self.K.update_add_mask_sym([ksin], self.loaddof, maskin)
+                #self.K.update_add_mask_sym([ksout], self.loaddofout, maskout)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof, maskin)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout, maskout)
 
     def fea(self):
         """
@@ -591,10 +594,7 @@ class Topology:
                         updatedKe = (VOID + (1 - VOID) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
-                    for i in range(len(e2sdofmap)):
-                        for j in range(len(e2sdofmap)):
-                            if mask[i]:
-                               K[e2sdofmap[i],e2sdofmap[j]] += updatedKe[i,j]
+                    K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
         else: #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
@@ -609,16 +609,22 @@ class Topology:
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
-                        for i in range(len(e2sdofmap)):
-                            for j in range(len(e2sdofmap)):
-                                if mask[i]:
-                                   K[e2sdofmap[i],e2sdofmap[j]] += updatedKe[i,j]
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
 
 
         # K.delete_rowcols(self._rcfixed) 
         #  Del constrained rows and columns
         K = K[self._rcfixed][:,self._rcfixed]
         return K
+
+    # Taken from the PySparse documentation
+    def _update_add_mask_sym(self, A, B, ind, mask):
+        for i in range(len(ind)):
+            for j in range(len(ind)):
+                if mask[i]:
+                    A[ind[i],ind[j]] += B[i,j]
+
+        return A
 
 
 # EOF topology.py
