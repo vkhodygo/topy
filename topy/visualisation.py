@@ -360,9 +360,9 @@ def _write_legacy_vtu(x, fname):
     except ValueError:
         sys.exit('Array dimensions not equal to 3, possibly 2-dimensional.\n')
 
-    for i in xrange(depth):
-        for j in xrange(rows):
-            for k in xrange(columns):
+    for i in range(depth):
+        for j in range(rows):
+            for k in range(columns):
                 if x[i,j,k] > THRESHOLD:
                     xculled.append(x[i,j,k])
                     points += (voxel_local_points + [i,j,k]).tolist()

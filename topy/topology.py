@@ -175,7 +175,7 @@ class Topology:
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
         self.r = np.zeros_like(self.alldof, dtype=np.float32) #  Load vector
         self.r[self.loaddof] = self.loadval #  Assign load values at loaded dof
-        self.rfree = self.r[self.freedof] #  Modified load vector (free dof)
+        self.rfree = np.asarray(self.r[self.freedof], dtype=np.float32) #  Modified load vector (free dof)
         self.d = np.zeros_like(self.r) #  Displacement vector
         self.dfree = np.zeros_like(self.rfree) #  Modified load vector (free dof)
         # Determine which rows and columns must be deleted from global K:
@@ -297,25 +297,24 @@ class Topology:
             if self.probtype == 'mech':
                 self.dfreeout = lu.solve(self.rfreeout)
         else: #  Iterative solver for 3D problems
-            # NOT UPDATED TO PYTHON 3
-            Kfree = Kfree.to_sss()
-            preK = precon.ssor(Kfree) #  Preconditioned Kfree
-            (info, numitr, relerr) = \
-            itsolvers.pcg(Kfree, self.rfree, self.dfree, 1e-8, 8000, preK)
-            if info < 0:
-                logger.error('PySparse error: Type: {}, '
-                             'at {} iterations'.format(info, numitr))
+            Kfree = sparse.csc_matrix(Kfree, dtype=np.float32)
+            lu = linalg.splu(Kfree)
+            preK_x = lambda x: lu.solve(np.asarray(x, dtype=np.float32))
+            preK = linalg.LinearOperator(Kfree.shape, preK_x)
+            # ToPy's original implementation used Preconditioned Conjugate Gradient (PCG) from PySparse.
+            # SciPy's implementation (linalg.cg) didn't converge. This was the first function that
+            # managed to converge, but it is pretty slow.
+            self.dfree, info = linalg.minres(Kfree, self.rfree, tol=1e-8, maxiter=8000, M=preK)
+            if info > 0:
+                logger.error('Solver error: Number of iterations: {}.'.format(info))
                 raise Exception('Solution for FEA did not converge.')
             else:
-                logger.debug('ToPy: Solution for FEA converged after '
-                             '{} iterations'.format(numitr))
+                logger.debug('TgPy: Solution for FEA converged.')
             if self.probtype == 'mech':  # mechanism synthesis
-                (info, numitr, relerr) = \
-                itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, \
-                    8000, preK)
-                if info < 0:
-                    logger.error('PySparse error: Type: {}, '
-                                 'at {} iterations'.format(info, numitr))
+                # This was also PCG.
+                self.dfreeout, info = linalg.minres(Kfree, self.rfreeout, tol=1e-8, maxiter=8000, M=preK)
+                if info > 0:
+                    logger.error('Solver error: Number of iterations: {}.'.format(info))
                     raise Exception('Solution for FEA of adjoint load '
                                     'case did not converge.')
 

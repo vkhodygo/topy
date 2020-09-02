@@ -349,8 +349,8 @@ def _checkparams(d):
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d:
             logger.info('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
     if d['DOF_PN'] == 3:
-        if not d.has_key('FXTR_NODE_X') or not d.has_key('FXTR_NODE_Y')\
-        or not d.has_key('FXTR_NODE_Z'):
+        if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d \
+        or 'FXTR_NODE_Z' not in d:
             logger.info('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
 
 # EOF parser.py
