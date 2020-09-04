@@ -2,8 +2,9 @@
 # ==============================================================================
 # Material constants and finite element dimensions.
 #
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
+# Copyright (C) 2020, Tarcísio L. de Oliveira
 # ==============================================================================
 """
 from __future__ import division
