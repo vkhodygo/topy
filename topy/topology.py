@@ -617,7 +617,8 @@ class Topology:
         K = K[self._rcfixed][:,self._rcfixed]
         return K
 
-    # Taken from the PySparse documentation
+    # Taken from the PySparse documentation, in order to act as a substitute
+    # for the method of the same name it provided for sparse matrices.
     def _update_add_mask_sym(self, A, B, ind, mask):
         for i in range(len(ind)):
             for j in range(len(ind)):

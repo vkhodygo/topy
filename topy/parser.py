@@ -250,7 +250,6 @@ def _parsev2020file(s):
         d['DOF_PN'] = int(d['DOF_PN'])
         d['ETA'] = str(d['ETA']).lower()
         d['ELEM_TYPE'] = d['ELEM_K']
-        d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
         raise ValueError('One or more parameters incorrectly specified.')
 
@@ -279,6 +278,14 @@ def _parsev2020file(s):
         d['ELEM_L'] = float(d['ELEM_L'])
     except:
         d['ELEM_L'] = 0.5
+
+    try:
+        d['ELEM_K'] = create_element[d['ELEM_TYPE']](
+                    d['ELEM_L'], d['ELEM_E'], d['ELEM_NU'], d['ELEM_TC']
+                )
+    except:
+        raise ValueError("Element name incorrectly specified.")
+
 
     # Check for stop conditions
     if 'NUM_ITER' not in d and \
