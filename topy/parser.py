@@ -129,6 +129,9 @@ def _parsev2007file(s):
     d['ELEM_TC'] = 1.0
     d['ELEM_L'] = 0.5
 
+    # Type of approach for topology optimization (backwards compatibility)
+    d['TO_TYPE'] = "trad"
+
     # Check for number of iterations or change stop value:
     try:
         d['NUM_ITER'] = int(d['NUM_ITER'])

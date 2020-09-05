@@ -6,7 +6,8 @@
 # ==============================================================================
 """
 
-from .topology import *
+from .topology_trad import *
+from .topology_gen import *
 from .visualisation import *
 from .elements import *
 from .optimisation import *
@@ -15,7 +16,8 @@ __version__ = "1.0.0"
 __author__  = "Tarcisio L. de Oliveira"
 
 __all__ = (
-	topology.__all__ +
+	topology_trad.__all__ +
+	topology_gen.__all__ +
 	visualisation.__all__ +
 	elements.__all__ +
 	optimisation.__all__

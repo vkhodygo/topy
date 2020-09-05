@@ -5,7 +5,6 @@ from numpy import array
 
 from .utils import get_logger
 from .visualisation import *
-from .topology import *
 
 logger = get_logger(__name__)
 

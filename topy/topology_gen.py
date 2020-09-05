@@ -19,8 +19,7 @@ from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
 
 logger = get_logger(__name__)
-logger.info("Instantiated.")
-__all__ = ['Topology']
+__all__ = ['TopologyGen']
 
 
 MAX_ITERS = 250
@@ -36,7 +35,7 @@ A_UPP = -1e-5 #  Upper restriction on 'a' for exponential approximation
 # =======================
 # === ToPy base class ===
 # =======================
-class Topology:
+class TopologyGen:
     """
     A class to optimise the topology of a design domain for defined boundary
     values. Data is read from an input file (see 'examples' folder).
@@ -61,6 +60,7 @@ class Topology:
     # ======================
     def load_tpd_file(self, fname):
         """
+        DEPRECATED. Need to check TO_TYPE before instantiating.
         Load a ToPy problem definition (TPD) file, return a dictionary:
 
         INPUTS:
@@ -114,7 +114,6 @@ class Topology:
             raise Exception('You must first load a TPD file!')
         self.probtype = self.topydict['PROB_TYPE'] #  Problem type
         self.probname = self.topydict.get('PROB_NAME', '') #  Problem name
-        self.volfrac = self.topydict['VOL_FRAC'] #  Volume fraction
         self.filtrad = self.topydict['FILT_RAD'] #  Filter radius
         self.p = self.topydict['P_FAC'] #  'Standard' penalisation factor
         self.dofpn = self.topydict['DOF_PN'] #  DOF per node
@@ -137,16 +136,27 @@ class Topology:
         logger.info('Element type (ELEM_K) = {}'.format(self.topydict['ELEM_TYPE']))
         logger.info('Filter radius (FILT_RAD) = {}'.format(self.filtrad))
 
-        # Check for either one of the following two, will take NUM_ITER if both
-        # are specified.
+        # Get stop conditions
         try:
             self.numiter = self.topydict['NUM_ITER'] #  Number of iterations
-            logger.info('Number of iterations (NUM_ITER) = %d' % (self.numiter))
-        except KeyError:
+        except:
+            self.numiter = 0
+        try:
             self.chgstop = self.topydict['CHG_STOP'] #  Change stop criteria
-            logger.info('Change stop value (CHG_STOP) = %.3e (%.2f%%)' \
-                % (self.chgstop, self.chgstop * 100))
-            self.numiter = MAX_ITERS
+        except:
+            self.chgstop = 0
+        try:
+            self.stressmax = self.topydict['STRESS_MAX'] # Maximum stress
+        except:
+            self.stressmax = 0
+        try:
+            self.strainmax = self.topydict['STRAIN_MAX'] # Maximum strain
+        except:
+            self.strainmax = 0
+        try:
+            self.volfrac = self.topydict['VOL_FRAC'] #  Volume fraction
+        except:
+            self.volfrac = 0
 
         # All DOF vector and design variables arrays:
         # This needs to be recoded at some point, perhaps. I originally
@@ -339,6 +349,7 @@ class Topology:
         """
         if not self.topydict:
             raise Exception('You must first load a TPD file!')
+
         tmp = np.zeros_like(self.df)
         rmin = int(np.floor(self.filtrad))
         if self.nelz == 0:
@@ -496,6 +507,7 @@ class Topology:
             move = 0.1
         else:
             move = 0.2
+
         lam1, lam2 = 0, 100e3
         dims = self.desvars.shape
         while (lam2 - lam1) / (lam2 + lam1) > 1e-8 and lam2 > 1e-40:
