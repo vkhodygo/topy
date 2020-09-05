@@ -255,13 +255,9 @@ class TopologyTrad:
             maskin = np.ones(self.loaddof.shape, dtype='int')
             maskout = np.ones(self.loaddofout.shape, dtype='int')
             if len(ksin) > 1:
-                # self.K.update_add_mask_sym([ksin, ksin], self.loaddof, maskin)
-                # self.K.update_add_mask_sym([ksout, ksout], self.loaddofout, maskout)
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksin, ksin]), self.loaddof, maskin)
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksout, ksout]), self.loaddofout, maskout)
             else:
-                #self.K.update_add_mask_sym([ksin], self.loaddof, maskin)
-                #self.K.update_add_mask_sym([ksout], self.loaddofout, maskout)
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof, maskin)
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout, maskout)
 
@@ -287,11 +283,6 @@ class TopologyTrad:
         Kfree = self._updateK(self.K.copy())
 
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
-            # Kfree = Kfree.to_csr() #  Need CSR for SuperLU factorisation
-            # lu = superlu.factorize(Kfree)
-            # lu.solve(self.rfree, self.dfree)
-            # if self.probtype == 'mech':
-            #     lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
             Kfree = sparse.csc_matrix(Kfree)
             lu = linalg.splu(Kfree)
             self.dfree = lu.solve(self.rfree)
@@ -613,7 +604,6 @@ class TopologyTrad:
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
 
 
-        # K.delete_rowcols(self._rcfixed) 
         #  Del constrained rows and columns
         K = K[self._rcfixed][:,self._rcfixed]
         return K
