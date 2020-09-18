@@ -19,7 +19,7 @@ from ..utils import get_logger
 
 logger = get_logger(__name__)
 
-def create_K(_L, _E, _nu, _k):
+def create_K(_L, _E, _nu, _k, _t):
     # Initialize variables
     _a, _b, _c = _L, _L, _L  # element dimensions (half-lengths)
     _G = _E / (2 * (1 + _nu))  # modulus of rigidity
@@ -57,13 +57,15 @@ def create_K(_L, _E, _nu, _k):
     K = dK.integrate((x, -a, a),(y, -b, b))
 
     # Convert SymPy Matrix to NumPy array:
-    K = array(K.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
+    K = _t * array(K.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
+    B = B.subs({a:_a, b:_b, E:_E, nu:_nu})
+    C = array(C.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0
 
     # Return result:
     logger.info('Created stiffness matrix.')
-    return K
+    return K, B, C
 
 # EOF Q4_K.py

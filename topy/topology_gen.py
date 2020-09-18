@@ -14,9 +14,11 @@ import numpy as np
 #from pysparse import superlu, itsolvers, precon
 from scipy import sparse
 from scipy.sparse import linalg
+from sympy import symbols
 
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
+from .visualisation import *
 
 logger = get_logger(__name__)
 __all__ = ['TopologyGen']
@@ -45,7 +47,7 @@ class TopologyGen:
                  qcount=0, itercount=0, change=1, svtfrac=None):
         self.pcount = pcount #  Counter for continuation of p
         self.qcount = qcount #  Counter for continuation of q for GSF
-        self.itercount = itercount #  Internal counter
+        self.itercount = itercount-1 #  Internal counter
         self.change = change
         self.svtfrac = svtfrac
 
@@ -58,6 +60,16 @@ class TopologyGen:
     # ======================
     # === Public methods ===
     # ======================
+    def preprocess_space(self):
+        Kfree = self.createK()
+        self.fea(Kfree)
+        logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
+        self.expand()
+        Kfree = self.preprocessK()
+
+        return Kfree
+
+
     def load_tpd_file(self, fname):
         """
         DEPRECATED. Need to check TO_TYPE before instantiating.
@@ -114,6 +126,7 @@ class TopologyGen:
             raise Exception('You must first load a TPD file!')
         self.probtype = self.topydict['PROB_TYPE'] #  Problem type
         self.probname = self.topydict.get('PROB_NAME', '') #  Problem name
+        self.volfrac = self.topydict['VOL_FRAC'] #  Volume fraction
         self.filtrad = self.topydict['FILT_RAD'] #  Filter radius
         self.p = self.topydict['P_FAC'] #  'Standard' penalisation factor
         self.dofpn = self.topydict['DOF_PN'] #  DOF per node
@@ -125,7 +138,10 @@ class TopologyGen:
         self.loaddof = self.topydict['LOAD_DOF'] #  Loaded dof vector
         self.loadval = self.topydict['LOAD_VAL'] #  Loaded dof values
         self.Ke = self.topydict['ELEM_K'] #  Element stiffness matrix
+        self.Be = self.topydict['ELEM_B'] #  Element strain interpolation matrix
+        self.Ce = self.topydict['ELEM_C'] #  Element linear elastic modulus matrix
         self.K = self.topydict['K'] #  Global stiffness matrix
+        self.Smax = self.topydict['STRESS_MAX'] # Maximum stress allowed
         if self.nelz:
             logger.info('Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x ' + \
                 'NUM_ELEM_Z) = %d x %d x %d' % (self.nelx, self.nely, self.nelz))
@@ -133,30 +149,26 @@ class TopologyGen:
             logger.info( 'Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d'\
                 % (self.nelx, self.nely))
 
+        if type(self.loaddof) is not list:
+            self.loaddof = np.asarray(self.loaddof)
+
         logger.info('Element type (ELEM_K) = {}'.format(self.topydict['ELEM_TYPE']))
         logger.info('Filter radius (FILT_RAD) = {}'.format(self.filtrad))
 
-        # Get stop conditions
+        # Check for either one of the following two, will take NUM_ITER if both
+        # are specified.
         try:
             self.numiter = self.topydict['NUM_ITER'] #  Number of iterations
-        except:
-            self.numiter = 0
-        try:
+            logger.info('Number of iterations (NUM_ITER) = %d' % (self.numiter))
+        except KeyError:
             self.chgstop = self.topydict['CHG_STOP'] #  Change stop criteria
-        except:
-            self.chgstop = 0
-        try:
-            self.stressmax = self.topydict['STRESS_MAX'] # Maximum stress
-        except:
-            self.stressmax = 0
-        try:
-            self.strainmax = self.topydict['STRAIN_MAX'] # Maximum strain
-        except:
-            self.strainmax = 0
-        try:
-            self.volfrac = self.topydict['VOL_FRAC'] #  Volume fraction
-        except:
-            self.volfrac = 0
+            logger.info('Change stop value (CHG_STOP) = %.3e (%.2f%%)' \
+                % (self.chgstop, self.chgstop * 100))
+            self.numiter = MAX_ITERS
+
+        self.stress = 0.0 # Current maximum stress
+        self.strain = 0.0 # Current maximum strain
+        self.disp   = 0.0 # Current maximum displacement
 
         # All DOF vector and design variables arrays:
         # This needs to be recoded at some point, perhaps. I originally
@@ -169,19 +181,23 @@ class TopologyGen:
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1))
                 self.desvars = np.zeros((self.nely, self.nelx)) + self.volfrac
+                self.stress_mat = np.zeros((self.nely, self.nelx))
             else:
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1) * (self.nelz + 1))
                 self.desvars = np.zeros((self.nelz, self.nely, self.nelx)) + \
                     self.volfrac
+                self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         elif self.dofpn == 2:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
             self.desvars = np.zeros((self.nely, self.nelx)) + self.volfrac
+            self.stress_mat = np.zeros((self.nely, self.nelx))
         else:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) *\
                 (self.nely + 1) * (self.nelz + 1))
             self.desvars = np.zeros((self.nelz, self.nely, self.nelx)) + \
                 self.volfrac
+            self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
         self.r = np.zeros_like(self.alldof, dtype=np.float32) #  Load vector
@@ -191,6 +207,7 @@ class TopologyGen:
         self.dfree = np.zeros_like(self.rfree) #  Modified load vector (free dof)
         # Determine which rows and columns must be deleted from global K:
         self._rcfixed = np.where(np.in1d(self.alldof, self.fixdof), False, True)
+        self.remove_list = self._rcfixed
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
@@ -271,7 +288,7 @@ class TopologyGen:
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof, maskin)
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout, maskout)
 
-    def fea(self):
+    def fea(self, Kfree):
         """
         Performs a Finite Element Analysis given the updated global stiffness
         matrix [K] and the load vector {r}, both of which must be in the
@@ -290,14 +307,16 @@ class TopologyGen:
         if self.itercount >= MAX_ITERS:
             raise Exception('Maximum internal number of iterations exceeded!')
 
-        Kfree = self._updateK(self.K.copy())
+        # Kfree = self._updateK(self.K.copy())
+
+        removed = self.remove_list[self._rcfixed].copy()
 
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
             Kfree = sparse.csc_matrix(Kfree)
             lu = linalg.splu(Kfree)
-            self.dfree = lu.solve(self.rfree)
+            self.dfree[removed] = lu.solve(self.rfree[removed])
             if self.probtype == 'mech':
-                self.dfreeout = lu.solve(self.rfreeout)
+                self.dfreeout[removed] = lu.solve(self.rfreeout[removed])
         else: #  Iterative solver for 3D problems
             Kfree = sparse.csc_matrix(Kfree, dtype=np.float32)
             lu = linalg.splu(Kfree)
@@ -324,8 +343,61 @@ class TopologyGen:
         self.d[self.freedof] = self.dfree
         if self.probtype == 'mech':  # 'adjoint' vectors
             self.dout[self.freedof] = self.dfreeout
+
+        # Calculate strain and stress values:
+        _L = self.topydict['ELEM_L']
+        if self.dofpn < 3 and self.nelz == 0:
+            x, y = symbols("x y")
+            num_elem = self.nelx * self.nely
+            strain_vec = np.zeros((3))
+            stress_vec = np.zeros((3))
+            for i in range(num_elem):
+                _x = int(np.floor(i / self.nely))
+                _y = i % self.nely
+                e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                (_y + _x * (self.nely + 1))
+                if self.desvars[_y, _x] > 0:
+                    B = np.array(self.Be.copy().subs({x:(2*_L*_x+_L), y:(2*_L*_y+_L)})).astype('double')
+                    strain_vec = np.dot(B, self.d[e2sdofmap])
+                    stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
+                    self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
+
+        else:
+            num_elem = self.nelx * self.nely
+            strain_vec = np.zeros((6))
+            stress_vec = np.zeros((6))
+            for i in range(num_elem):
+                _z = int(np.floor(i / (self.nely * self.nelx)))
+                rest = i % (self.nely * self.nelx)
+                _x = int(np.floor(rest / self.nely))
+                _y = rest % self.nely
+                # ADAPT 2D CALCULATIONS TO 3D
+                # USE E2SDOFMAPI
+                B = np.array(self.Be.copy().subs({x:_x, y:_y, z:_z})).astype('double')
+                strain_vec = self.desvars[_z, _y, _x] * np.dot(B, self.d[e2sdofmap])
+                stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
+                self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
+
+        # Filter force singularities
+        if self.itercount >= 0:
+            self._saint_venant()
+        
+        # Maximum stress reached
+        self.stress = np.max(self.stress_mat)
+
         # Increment internal iteration counter
         self.itercount += 1
+
+        # Display stress map
+        params = {
+            'prefix': self.probname+"_stress",
+            'iternum': self.itercount,
+            'time': 'none',
+            'filetype': 'png',
+            'dir': "iterations"
+        }
+        stress_img = self.stress_mat.copy()/self.stress
+        create_2d_imag(stress_img, **params)
 
     def filter_sens_sigmund(self):
         """
@@ -340,7 +412,6 @@ class TopologyGen:
         """
         if not self.topydict:
             raise Exception('You must first load a TPD file!')
-
         tmp = np.zeros_like(self.df)
         rmin = int(np.floor(self.filtrad))
         if self.nelz == 0:
@@ -349,15 +420,16 @@ class TopologyGen:
                 umin = np.maximum(i - rmin - 1, 0)
                 umax = np.minimum(i + rmin + 2, self.nelx + 1)
                 for j in range(self.nely):
-                    vmin = np.maximum(j - rmin - 1, 0)
-                    vmax = np.minimum(j + rmin + 2, self.nely + 1)
-                    u = U[umin: umax, vmin: vmax]
-                    v = V[umin: umax, vmin: vmax]
-                    dist = self.filtrad - np.sqrt((i - u) ** 2 + (j - v) ** 2)
-                    sumnumr = (np.maximum(0, dist) * self.desvars[v, u] *\
-                               self.df[v, u]).sum()
-                    sumconv = np.maximum(0, dist).sum()
-                    tmp[j, i] = sumnumr / (sumconv * self.desvars[j, i])
+                    if self.desvars[j, i] > 0:
+                        vmin = np.maximum(j - rmin - 1, 0)
+                        vmax = np.minimum(j + rmin + 2, self.nely + 1)
+                        u = U[umin: umax, vmin: vmax]
+                        v = V[umin: umax, vmin: vmax]
+                        dist = self.filtrad - np.sqrt((i - u) ** 2 + (j - v) ** 2)
+                        sumnumr = (np.maximum(0, dist) * self.desvars[v, u] *\
+                                   self.df[v, u]).sum()
+                        sumconv = np.maximum(0, dist).sum()
+                        tmp[j, i] = sumnumr / (sumconv * self.desvars[j, i])
         else:
             rmin3 = rmin
             U, V, W = np.indices((self.nelx, self.nely, self.nelz))
@@ -368,18 +440,19 @@ class TopologyGen:
                     vmin, vmax = np.maximum(j - rmin - 1, 0),\
                                  np.minimum(j + rmin + 2, self.nely + 1)
                     for k in range(self.nelz):
-                        wmin, wmax = np.maximum(k - rmin3 - 1, 0),\
-                                     np.minimum(k + rmin3 + 2, self.nelz + 1)
-                        u = U[umin:umax, vmin:vmax, wmin:wmax]
-                        v = V[umin:umax, vmin:vmax, wmin:wmax]
-                        w = W[umin:umax, vmin:vmax, wmin:wmax]
-                        dist = self.filtrad - np.sqrt((i - u) ** 2 + (j - v) **\
-                               2 + (k - w) ** 2)
-                        sumnumr = (np.maximum(0, dist) * self.desvars[w, v, u] *\
-                                  self.df[w, v, u]).sum()
-                        sumconv = np.maximum(0, dist).sum()
-                        tmp[k, j, i] = sumnumr/(sumconv *\
-                        self.desvars[k, j, i])
+                        if self.desvars[k, j, i] > 0:
+                            wmin, wmax = np.maximum(k - rmin3 - 1, 0),\
+                                         np.minimum(k + rmin3 + 2, self.nelz + 1)
+                            u = U[umin:umax, vmin:vmax, wmin:wmax]
+                            v = V[umin:umax, vmin:vmax, wmin:wmax]
+                            w = W[umin:umax, vmin:vmax, wmin:wmax]
+                            dist = self.filtrad - np.sqrt((i - u) ** 2 + (j - v) **\
+                                   2 + (k - w) ** 2)
+                            sumnumr = (np.maximum(0, dist) * self.desvars[w, v, u] *\
+                                      self.df[w, v, u]).sum()
+                            sumconv = np.maximum(0, dist).sum()
+                            tmp[k, j, i] = sumnumr/(sumconv *\
+                            self.desvars[k, j, i])
 
         self.df = tmp
 
@@ -480,6 +553,8 @@ class TopologyGen:
         self.pcount += 1
         self.qcount += 1
 
+        removed_mask = np.equal(self.desvars, 0)
+
         # Exponential approximation of eta (damping factor):
         if self.itercount > 1:
             if self.topydict['ETA'] == 'exp': #  Check TPD specified value
@@ -566,6 +641,7 @@ class TopologyGen:
                     lam2 = lammid
         self.lam = lammid
 
+        desvars[removed_mask] = 0
         self.desvars = desvars
 
         # Change in design variables:
@@ -574,30 +650,81 @@ class TopologyGen:
         # Solid-void fraction:
         nr_s = self.desvars.flatten().tolist().count(SOLID)
         nr_v = self.desvars.flatten().tolist().count(VOID)
-        self.svtfrac = (nr_s + nr_v) / self.desvars.size
+        nr_0 = self.desvars.flatten().tolist().count(0)
+        self.svtfrac = (nr_s + nr_v + nr_0) / self.desvars.size
 
     # ===================================
     # === Private methods and helpers ===
     # ===================================
-    def _updateK(self, K):
+    def createK(self):
         """
         Update the global stiffness matrix by looking at each element's
         contribution i.t.o. design domain density and the penalisation factor.
         Return unconstrained stiffness matrix.
 
         """
+        K = self.K.copy()
+        self.remove_list = self._rcfixed.copy()
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
                     (ely + elx * (self.nely + 1))
-                    if self.probtype == 'comp' or self.probtype == 'mech':
-                        updatedKe = self.desvars[ely, elx] ** self.p * self.Ke
-                    elif self.probtype == 'heat':
-                        updatedKe = (VOID + (1 - VOID) * \
-                        self.desvars[ely, elx] ** self.p) * self.Ke
-                    mask = np.ones(e2sdofmap.size, dtype=int)
-                    K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                    if ely == int(self.nely/2):
+
+                        updatedKe = self.Ke
+                        self.desvars[ely, elx] = 1
+
+                        mask = np.ones(e2sdofmap.size, dtype=int)
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                    else:
+                        self.desvars[ely, elx] = 0
+            for i in range(K.shape[0]):
+                if K[i, i] == 0:
+                    self.remove_list[i] = False
+
+        else: #  3D problem
+            for elz in range(self.nelz):
+                for elx in range(self.nelx):
+                    for ely in range(self.nely):
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1) + elz *\
+                                    (self.nelx + 1) * (self.nely + 1))
+                        if self.probtype == 'comp' or self.probtype == 'mech':
+                            updatedKe = self.desvars[elz, ely, elx] ** \
+                            self.p * self.Ke
+                        elif self.probtype == 'heat':
+                            updatedKe = (VOID + (1 - VOID) * \
+                            self.desvars[elz, ely, elx] ** self.p) * self.Ke
+                        mask = np.ones(e2sdofmap.size, dtype=int)
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
+        #  Del constrained rows and columns
+        K = K[self.remove_list][:,self.remove_list]
+        return K
+
+    def updateK(self):
+        """
+        Update the global stiffness matrix by looking at each element's
+        contribution i.t.o. design domain density and the penalisation factor.
+        Return unconstrained stiffness matrix.
+
+        """
+
+        K = self.K.copy()
+        if self.nelz == 0: #  2D problem
+            for elx in range(self.nelx):
+                for ely in range(self.nely):
+                    if self.desvars[ely, elx] > 0:
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                        (ely + elx * (self.nely + 1))
+                        if self.probtype == 'comp' or self.probtype == 'mech':
+                            updatedKe = self.desvars[ely, elx] ** self.p * self.Ke
+                        elif self.probtype == 'heat':
+                            updatedKe = (VOID + (1 - VOID) * \
+                            self.desvars[ely, elx] ** self.p) * self.Ke
+                        mask = np.ones(e2sdofmap.size, dtype=int)
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
         else: #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
@@ -616,8 +743,118 @@ class TopologyGen:
 
 
         #  Del constrained rows and columns
-        K = K[self._rcfixed][:,self._rcfixed]
+        K = K[self.remove_list][:,self.remove_list]
         return K
+
+    def expand(self):
+        """
+        Generate a basic structure based on the preliminary stress analysis
+        """
+        warn_width = False
+        warn_height = False
+        if self.nelz == 0: #  2D problem
+            for elx in range(self.nelx):
+                for ely in range(self.nely):
+                    if self.stress_mat[ely, elx] > 0:
+                        h = np.ceil(np.sqrt(self.stress_mat[ely, elx]/self.Smax))
+                        h += h % 2 # Make h even
+                        umin = int(np.maximum(elx - h/2, 0))
+                        umax = int(np.minimum(elx + h/2 + 1, self.nelx))
+                        if umax - umin < h and not warn_width:
+                            logger.info("Warning: design space may have insufficient width.")
+                            warn_width = True
+                        vmin = int(np.maximum(ely - h/2, 0))
+                        vmax = int(np.minimum(ely + h/2 + 1, self.nely))
+                        if vmax - vmin < h and not warn_height:
+                            logger.info("Warning: design space may have insufficient height.")
+                            warn_height = True
+                        for i in range(umin, umax):
+                            for j in range(vmin, vmax):
+                                if (i-elx)**2 + (j-ely)**2 <= (h/2)**2:
+                                    self.desvars[j, i] = SOLID
+                        #print(self.desvars[vmin:vmax, umin:umax])
+        else: #  3D problem
+            for elz in range(self.nelz):
+                for elx in range(self.nelx):
+                    for ely in range(self.nely):
+                        print()
+
+    def preprocessK(self):
+        """
+        Remove elements which will not be used in the problem.
+        """
+        K = self.K.copy()
+        self.remove_list = self._rcfixed.copy()
+        if self.nelz == 0: #  2D problem
+            for elx in range(self.nelx):
+                for ely in range(self.nely):
+                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                    (ely + elx * (self.nely + 1))
+                    if self.desvars[ely, elx] == SOLID:
+                        updatedKe = self.Ke
+                        mask = np.ones(e2sdofmap.size, dtype=int)
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
+            for i in range(K.shape[0]):
+                if K[i, i] == 0:
+                    self.remove_list[i] = False
+
+        else: #  3D problem
+            for elz in range(self.nelz):
+                for elx in range(self.nelx):
+                    for ely in range(self.nely):
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1) + elz *\
+                                    (self.nelx + 1) * (self.nely + 1))
+                        if self.probtype == 'comp' or self.probtype == 'mech':
+                            updatedKe = self.desvars[elz, ely, elx] ** \
+                            self.p * self.Ke
+                        elif self.probtype == 'heat':
+                            updatedKe = (VOID + (1 - VOID) * \
+                            self.desvars[elz, ely, elx] ** self.p) * self.Ke
+                        mask = np.ones(e2sdofmap.size, dtype=int)
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
+        #  Del constrained rows and columns
+        K = K[self.remove_list][:,self.remove_list]
+        return K
+
+    def _saint_venant(self):
+        multipliers = np.asarray([[1.0, 0.5, 0.5, 1.0],
+                                  [0.5, 0.0, 0.0, 0.5],
+                                  [0.5, 0.0, 0.0, 0.5],
+                                  [1.0, 0.5, 0.5, 1.0]])
+
+        if self.nelz == 0: #  2D problem
+            nodes = np.floor(self.loaddof / self.dofpn) + 1
+            node_x = (np.floor(nodes / (self.nely + 1))).astype(int)
+            node_y = (nodes % (self.nely + 1)).astype(int) - 1
+
+            umin = np.maximum(node_x - 2, 0)
+            umax = np.minimum(node_x + 2, self.nelx)
+            vmin = np.maximum(node_y - 2, 0)
+            vmax = np.minimum(node_y + 2, self.nely)
+            true_xmin = node_x - 2
+            true_ymin = node_y - 2
+
+            for i in range(len(umin)):
+                xmin = umin[i]
+                xmax = umax[i]
+                ymin = vmin[i]
+                ymax = vmax[i]
+
+                xmin_m = xmin - true_xmin[i] 
+                xmax_m = xmax - true_xmin[i] 
+                ymin_m = ymin - true_ymin[i] 
+                ymax_m = ymax - true_ymin[i] 
+
+                subsm = self.stress_mat[ymin:ymax, xmin:xmax]
+                submult = multipliers[ymin_m:ymax_m, xmin_m:xmax_m]
+
+                self.stress_mat[ymin:ymax, xmin:xmax] = np.multiply(subsm, submult)
+
+        else: #  3D problem
+            print()
 
     # Taken from the PySparse documentation, in order to act as a substitute
     # for the method of the same name it provided for sparse matrices.
@@ -628,6 +865,10 @@ class TopologyGen:
                     A[ind[i],ind[j]] += B[i,j]
 
         return A
+
+    # Calculates von Mises criterion
+    def _von_Mises(self, s11, s22, s33, s12, s13, s23):
+        return np.sqrt(0.5*((s11 - s22)**2 + (s22 - s33)**2 + (s33 - s11)**2 + 6*(s12**2 + s13**2 + s23**2)))
 
 
 # EOF topology.py

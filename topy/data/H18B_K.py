@@ -20,7 +20,7 @@ from ..utils import get_logger
 
 logger = get_logger(__name__)
 
-def create_K(_L, _E, _nu, _k):
+def create_K(_L, _E, _nu, _k, _t):
     # Initialize variables
     _a, _b, _c = _L, _L, _L  # element dimensions (half-lengths)
     _G = _E / (2 * (1 + _nu))  # modulus of rigidity
@@ -100,12 +100,14 @@ def create_K(_L, _E, _nu, _k):
     # NOTE:
     # sympy.Matrix() * sympy.Matrix == numpy.dot(numpy.array(), numpy.array())
     K = dot(dot(J.transpose(), iH), J)  # use NumPy's dot for arrays, NOT '*'
+    B = B.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})
+    C = array(C.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})).astype('double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0
 
     # Return result:
     logger.info('Created stiffness matrix.')
-    return K
+    return K, B, C
 
 # EOF H18B_K.py

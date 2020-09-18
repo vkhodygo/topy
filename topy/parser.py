@@ -128,6 +128,7 @@ def _parsev2007file(s):
     d['ELEM_NU'] = 1.0/3
     d['ELEM_TC'] = 1.0
     d['ELEM_L'] = 0.5
+    d['THICKNESS'] = 1.0
 
     # Type of approach for topology optimization (backwards compatibility)
     d['TO_TYPE'] = "trad"
@@ -245,6 +246,7 @@ def _parsev2020file(s):
     try:
         d['PROB_TYPE'] = d['PROB_TYPE'].lower()
         d['TO_TYPE'] = d['TO_TYPE'].lower()
+        d['VOL_FRAC']   = float(d['VOL_FRAC'])
         d['FILT_RAD'] = float(d['FILT_RAD'])
         d['P_FAC'] = float(d['P_FAC'])
         d['NUM_ELEM_X'] = int(d['NUM_ELEM_X'])
@@ -253,6 +255,7 @@ def _parsev2020file(s):
         d['DOF_PN'] = int(d['DOF_PN'])
         d['ETA'] = str(d['ETA']).lower()
         d['ELEM_TYPE'] = d['ELEM_K']
+        d['STRESS_MAX'] = float(d['STRESS_MAX'])*1e6
     except:
         raise ValueError('One or more parameters incorrectly specified.')
 
@@ -260,7 +263,7 @@ def _parsev2020file(s):
 
     # Modulus of Elasticity
     try:
-        d['ELEM_E'] = float(d['ELEM_E'])
+        d['ELEM_E'] = float(d['ELEM_E'])*1e+9 # GPa to Pa
     except:
         d['ELEM_E'] = 1.0
 
@@ -278,41 +281,35 @@ def _parsev2020file(s):
 
     # Element length of side, halved (elements are squares or cubes)
     try:
-        d['ELEM_L'] = float(d['ELEM_L'])
+        d['ELEM_L'] = float(d['ELEM_L'])*1e-3 # mm to m
     except:
         d['ELEM_L'] = 0.5
 
+    # Thickness (for 2D elements)
     try:
-        d['ELEM_K'] = create_element[d['ELEM_TYPE']](
-                    d['ELEM_L'], d['ELEM_E'], d['ELEM_NU'], d['ELEM_TC']
+        d['THICKNESS'] = float(d['THICKNESS'])*1e-3 # mm to m
+    except:
+        d['THICKNESS'] = 1.0
+
+    try:
+        K, B, C = create_element[d['ELEM_TYPE']](
+                    d['ELEM_L'], d['ELEM_E'], d['ELEM_NU'], d['ELEM_TC'], d['THICKNESS']
                 )
+        d['ELEM_K'] = K
+        d['ELEM_B'] = B
+        d['ELEM_C'] = C
     except:
         raise ValueError("Element name incorrectly specified.")
 
 
-    # Check for stop conditions
-    if 'NUM_ITER' not in d and \
-       'CHG_STOP' not in d and \
-       'VOL_FRAC' not in d and \
-       'STRESS_MAX' not in d and \
-       'STRAIN_MAX' not in d:
-        raise ValueError("Missing stop conditions")
-
-    if 'STRESS_MAX' not in d and \
-       'STRAIN_MAX' not in d and \
-       d['TO_TYPE'] == "gen":
-       logger.info("Warning: stress and strain conditions missing, algorithm may not behave as expected.")
-
-    if 'NUM_ITER' in d:
-        d['NUM_ITER']   = int(d['NUM_ITER'])
-    if 'CHG_STOP' in d:
-        d['CHG_STOP']   = float(d['CHG_STOP'])
-    if 'VOL_FRAC' in d:
-        d['VOL_FRAC']   = float(d['VOL_FRAC'])
-    if 'STRESS_MAX' in d:
-        d['STRESS_MAX'] = float(d['STRESS_MAX'])
-    if 'STRAIN_MAX' in d:
-        d['STRAIN_MAX'] = float(d['STRAIN_MAX'])
+    # Check for number of iterations or change stop value:
+    try:
+        d['NUM_ITER'] = int(d['NUM_ITER'])
+    except KeyError:
+        try:
+            d['CHG_STOP'] = float(d['CHG_STOP'])
+        except KeyError:
+            raise ValueError("Neither NUM_ITER nor CHG_STOP was declared")
 
     # Check for GSF penalty factor:
     try:

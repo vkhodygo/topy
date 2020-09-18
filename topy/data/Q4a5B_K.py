@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 # spurious zero energy modes are not introduced, for which an investigation
 # of characteristic equations of the elemental stiffness matrix is needed.
 # Element thickness set = 1. See De Klerk and Groenwold for details.
-def create_K(_L, _E, _nu, _k):
+def create_K(_L, _E, _nu, _k, _t):
     logger.info('Generating K for Q4a5B...')
     logger.info('Q4a5B uses Q4 and Q4bar for its creation, so they will also be created...')
 
@@ -30,10 +30,14 @@ def create_K(_L, _E, _nu, _k):
     alpha2D = (2 * _L**2 * (1 - _nu) * (2 * _nu**2 - _nu + 1)) \
               / (3 * (_nu + 1) * _E**2)
 
+    K_Q4, B_Q4, C_Q4 = Q4_K.create_K(_L, _E, _nu, _k, _t)
+    K_Q4bar, B_Q4bar, C_Q4bar = Q4bar_K.create_K(_L, _E, _nu, _k, _t)
+
     # Stiffness matrix
-    Q4a5B = Q4_K.create_K(_L, _E, _nu, _k) \
-           - alpha2D * _E * \
-           Q4bar_K.create_K(_L, _E, _nu, _k)
+    K = K_Q4 - alpha2D * _E * K_Q4bar
+    # I'm not sure if this is correct
+    B = B_Q4 - alpha2D * _E * B_Q4bar
+    C = C_Q4 - alpha2D * _E * C_Q4bar
 
     logger.info("Created stiffness matrix for Q4a5B.")
-    return Q4a5B
+    return K, B, C
