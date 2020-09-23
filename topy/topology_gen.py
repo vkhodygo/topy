@@ -19,6 +19,7 @@ from sympy import symbols
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
 from .visualisation import *
+from .pathfinding import get_path, split, active_points, passive_points
 
 logger = get_logger(__name__)
 __all__ = ['TopologyGen']
@@ -180,23 +181,21 @@ class TopologyGen:
                 self.e2sdofmapi = self.e2sdofmapi[0:4]
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1))
-                self.desvars = np.zeros((self.nely, self.nelx)) + self.volfrac
+                self.desvars = np.zeros((self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nely, self.nelx))
             else:
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1) * (self.nelz + 1))
-                self.desvars = np.zeros((self.nelz, self.nely, self.nelx)) + \
-                    self.volfrac
+                self.desvars = np.zeros((self.nelz, self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         elif self.dofpn == 2:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
-            self.desvars = np.zeros((self.nely, self.nelx)) + self.volfrac
+            self.desvars = np.zeros((self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nely, self.nelx))
         else:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) *\
                 (self.nely + 1) * (self.nelz + 1))
-            self.desvars = np.zeros((self.nelz, self.nely, self.nelx)) + \
-                self.volfrac
+            self.desvars = np.zeros((self.nelz, self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
@@ -355,7 +354,7 @@ class TopologyGen:
                 _x = int(np.floor(i / self.nely))
                 _y = i % self.nely
                 e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                (_y + _x * (self.nely + 1))
+                            (_y + _x * (self.nely + 1))
                 if self.desvars[_y, _x] > 0:
                     B = np.array(self.Be.copy().subs({x:(2*_L*_x+_L), y:(2*_L*_y+_L)})).astype('double')
                     strain_vec = np.dot(B, self.d[e2sdofmap])
@@ -363,6 +362,7 @@ class TopologyGen:
                     self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
 
         else:
+            x, y, z = symbols("x y z")
             num_elem = self.nelx * self.nely
             strain_vec = np.zeros((6))
             stress_vec = np.zeros((6))
@@ -371,16 +371,18 @@ class TopologyGen:
                 rest = i % (self.nely * self.nelx)
                 _x = int(np.floor(rest / self.nely))
                 _y = rest % self.nely
-                # ADAPT 2D CALCULATIONS TO 3D
-                # USE E2SDOFMAPI
-                B = np.array(self.Be.copy().subs({x:_x, y:_y, z:_z})).astype('double')
-                strain_vec = self.desvars[_z, _y, _x] * np.dot(B, self.d[e2sdofmap])
-                stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
-                self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
+                e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                            (ely + elx * (self.nely + 1) + elz *\
+                            (self.nelx + 1) * (self.nely + 1))
+                if self.desvars[_y, _x] > 0:
+                    B = np.array(self.Be.copy().subs({x:_x, y:_y, z:_z})).astype('double')
+                    strain_vec = np.dot(B, self.d[e2sdofmap])
+                    stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
+                    self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
 
-        # Filter force singularities
-        if self.itercount >= 0:
-            self._saint_venant()
+        # # Filter force singularities
+        # if self.itercount >= 0:
+        #     self._saint_venant()
         
         # Maximum stress reached
         self.stress = np.max(self.stress_mat)
@@ -389,15 +391,24 @@ class TopologyGen:
         self.itercount += 1
 
         # Display stress map
-        params = {
-            'prefix': self.probname+"_stress",
-            'iternum': self.itercount,
-            'time': 'none',
-            'filetype': 'png',
-            'dir': "iterations"
-        }
         stress_img = self.stress_mat.copy()/self.stress
-        create_2d_imag(stress_img, **params)
+        if self.dofpn < 3 and self.nelz == 0:
+            params = {
+                'prefix': self.probname+"_stress",
+                'iternum': self.itercount,
+                'time': 'none',
+                'filetype': 'png',
+                'dir': "iterations"
+            }
+            create_2d_imag(stress_img, **params)
+        else:
+            params = {
+                'prefix': self.probname+"_stress",
+                'iternum': self.itercount,
+                'time': 'none',
+                'dir': "iterations"
+            }
+            create_3d_geom(stress_img, **params)
 
     def filter_sens_sigmund(self):
         """
@@ -665,39 +676,41 @@ class TopologyGen:
         """
         K = self.K.copy()
         self.remove_list = self._rcfixed.copy()
+
+        loads = split(self.loaddof, self.nelx, self.nely, self.nelz)
+
+        for l in loads:
+            self.desvars = get_path(self.desvars,
+                    split(self.fixdof, self.nelx, self.nely, self.nelz), 
+                    active_points(self.actv, self.nelx, self.nely, self.nelz), 
+                    passive_points(self.pasv, self.nelx, self.nely, self.nelz), 
+                    l)
+
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
-                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                    (ely + elx * (self.nely + 1))
-                    if ely == int(self.nely/2):
-
+                    if self.desvars[ely, elx] == 1:
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1))
                         updatedKe = self.Ke
-                        self.desvars[ely, elx] = 1
-
                         mask = np.ones(e2sdofmap.size, dtype=int)
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
-                    else:
-                        self.desvars[ely, elx] = 0
-            for i in range(K.shape[0]):
-                if K[i, i] == 0:
-                    self.remove_list[i] = False
 
         else: #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
                     for ely in range(self.nely):
-                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                    (ely + elx * (self.nely + 1) + elz *\
-                                    (self.nelx + 1) * (self.nely + 1))
-                        if self.probtype == 'comp' or self.probtype == 'mech':
-                            updatedKe = self.desvars[elz, ely, elx] ** \
-                            self.p * self.Ke
-                        elif self.probtype == 'heat':
-                            updatedKe = (VOID + (1 - VOID) * \
-                            self.desvars[elz, ely, elx] ** self.p) * self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        if self.desvars[elz, ely, elx] == 1:
+                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                        (ely + elx * (self.nely + 1) + elz *\
+                                        (self.nelx + 1) * (self.nely + 1))
+                            updatedKe = self.Ke
+                            mask = np.ones(e2sdofmap.size, dtype=int)
+                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
+        for i in range(K.shape[0]):
+            if K[i, i] == 0:
+                self.remove_list[i] = False
 
         #  Del constrained rows and columns
         K = K[self.remove_list][:,self.remove_list]
@@ -869,6 +882,5 @@ class TopologyGen:
     # Calculates von Mises criterion
     def _von_Mises(self, s11, s22, s33, s12, s13, s23):
         return np.sqrt(0.5*((s11 - s22)**2 + (s22 - s33)**2 + (s33 - s11)**2 + 6*(s12**2 + s13**2 + s23**2)))
-
 
 # EOF topology.py
