@@ -167,7 +167,7 @@ def _parsev2007file(s):
 
     # Check for active elements:
     try:
-        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM']) - 1
+        d['ACTV_ELEM'] = (_tpd2vec(d['ACTV_ELEM']) - 1).astype(np.int64)
     except KeyError:
         d['ACTV_ELEM'] = _tpd2vec('')
     except AttributeError:
@@ -175,7 +175,7 @@ def _parsev2007file(s):
 
     # Check for passive elements:
     try:
-        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM']) - 1
+        d['PASV_ELEM'] = (_tpd2vec(d['PASV_ELEM']) - 1).astype(np.int64)
     except KeyError:
         d['PASV_ELEM'] = _tpd2vec('')
     except AttributeError:
@@ -336,7 +336,7 @@ def _parsev2020file(s):
 
     # Check for active elements:
     try:
-        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM']) - 1
+        d['ACTV_ELEM'] = (_tpd2vec(d['ACTV_ELEM']) - 1).astype(np.int64)
     except KeyError:
         d['ACTV_ELEM'] = _tpd2vec('')
     except AttributeError:
@@ -344,7 +344,7 @@ def _parsev2020file(s):
 
     # Check for passive elements:
     try:
-        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM']) - 1
+        d['PASV_ELEM'] = (_tpd2vec(d['PASV_ELEM']) - 1).astype(np.int64)
     except KeyError:
         d['PASV_ELEM'] = _tpd2vec('')
     except AttributeError:
