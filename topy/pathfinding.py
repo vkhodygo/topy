@@ -183,16 +183,14 @@ def get_path(mesh, supports, active, passive, load):
     else:
         nelz, nely, nelx = mesh.shape
 
-    queue_start = []
-
     if len(active) > 0:
-        queue_a = []
-
+        queue_l = []
         for l in load:
             if l not in passive:
-                heapq.heappush(queue_a, (shortest_dist(active[0], l), PathNode(l, None)))
+                heapq.heappush(queue_l, (shortest_dist(active[0], l), PathNode(l, None)))
 
         for i in range(len(active)):
+            queue_a = queue_l.copy()
             a = active[i]
             for p in a:
                 mesh[p] = 1
@@ -208,28 +206,46 @@ def get_path(mesh, supports, active, passive, load):
             if i < len(active)-1:
                 heapq.heappush(queue_a, (shortest_dist(active[i+1], e[1].elem), e[1]))
 
-        queue_start.append((shortest_dist(supports[0], n), e[1]))
+            begin = e
+
+            for s in supports:
+                queue_s = [(shortest_dist(s, n), begin[1])]
+                heapq.heapify(queue_s)
+
+                e = heapq.heappop(queue_s)
+                while e[1].elem not in s:
+                    neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
+                    for n in neighbors:
+                        if n not in passive:
+                            heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
+                    e = heapq.heappop(queue_s)
+
+                while e != None:
+                    mesh[e[1].elem] = 1
+                    e = e[1].prev
 
     else:
+        queue_start = []
+
         for l in load:
             if l not in passive:
                 queue_start.append((shortest_dist(supports[0], l), PathNode(l, None)))
 
-    for s in supports:
-        queue_s = queue_start.copy()
-        heapq.heapify(queue_s)
+        for s in supports:
+            queue_s = queue_start.copy()
+            heapq.heapify(queue_s)
 
-        e = heapq.heappop(queue_s)
-        while e[1].elem not in s:
-            neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
-            for n in neighbors:
-                if n not in passive:
-                    heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
             e = heapq.heappop(queue_s)
+            while e[1].elem not in s:
+                neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
+                for n in neighbors:
+                    if n not in passive:
+                        heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
+                e = heapq.heappop(queue_s)
 
-        while e != None:
-            mesh[e[1].elem] = 1
-            e = e[1].prev
+            while e != None:
+                mesh[e[1].elem] = 1
+                e = e[1].prev
 
     return mesh
 
