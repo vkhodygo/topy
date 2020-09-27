@@ -1,0 +1,28 @@
+[ToPy Problem Definition File v2020]
+
+# Authors: Tarcisio L. de Oliveira
+
+TO_TYPE:     gen          # or trad, for traditional approach
+
+ELEM_E:      186          # GPa
+ELEM_NU:     0.29
+ELEM_TC:     51.9         # W/(m*K)
+ELEM_L:      5            # mm (half-length of element)
+THICKNESS  : 10	          # mm
+
+PROB_TYPE  : heat
+PROB_NAME  : heat_2d_reci
+DOF_PN     : 1
+ELEM_K     : Q4T
+NUM_ITER   : 100
+NUM_ELEM_X : 40
+NUM_ELEM_Y : 40
+NUM_ELEM_Z : 0
+FXTR_NODE_X: 19|23
+LOAD_NODE_X: 861|1681
+LOAD_VALU_X: 1@821   # W
+
+ETA        : 0.5
+VOL_FRAC   : 0.4
+FILT_RAD   : 1.2
+P_FAC      : 3

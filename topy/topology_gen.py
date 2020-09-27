@@ -19,7 +19,7 @@ from sympy import symbols
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
 from .visualisation import *
-from .pathfinding import get_path, split, active_points, passive_points
+from .pathfinding import *
 
 logger = get_logger(__name__)
 __all__ = ['TopologyGen']
@@ -64,8 +64,9 @@ class TopologyGen:
     def preprocess_space(self):
         Kfree = self.createK()
         self.fea(Kfree)
-        logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
-        self.expand()
+        if self.probtype != "heat":
+            logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
+            self.expand()
         Kfree = self.preprocessK()
 
         return Kfree
@@ -343,29 +344,32 @@ class TopologyGen:
         if self.probtype == 'mech':  # 'adjoint' vectors
             self.dout[self.freedof] = self.dfreeout
 
+        if self.probtype == 'heat':
+            self.itercount += 1
+            return
+
         # Calculate strain and stress values:
         _L = self.topydict['ELEM_L']
         if self.dofpn < 3 and self.nelz == 0:
             x, y = symbols("x y")
             num_elem = self.nelx * self.nely
-            strain_vec = np.zeros((3))
-            stress_vec = np.zeros((3))
             for i in range(num_elem):
                 _x = int(np.floor(i / self.nely))
                 _y = i % self.nely
                 e2sdofmap = self.e2sdofmapi + self.dofpn *\
                             (_y + _x * (self.nely + 1))
                 if self.desvars[_y, _x] > 0:
-                    B = np.array(self.Be.copy().subs({x:(2*_L*_x+_L), y:(2*_L*_y+_L)})).astype('double')
+                    B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
                     strain_vec = np.dot(B, self.d[e2sdofmap])
                     stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
-                    self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
+                    if self.probtype == 'comp' or self.probtype == 'mech':
+                        self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
+                    elif self.probtype == 'heat':
+                        self.stress_mat[_y, _x] = np.linalg.norm(stress_vec)
 
         else:
             x, y, z = symbols("x y z")
             num_elem = self.nelx * self.nely
-            strain_vec = np.zeros((6))
-            stress_vec = np.zeros((6))
             for i in range(num_elem):
                 _z = int(np.floor(i / (self.nely * self.nelx)))
                 rest = i % (self.nely * self.nelx)
@@ -375,7 +379,7 @@ class TopologyGen:
                             (ely + elx * (self.nely + 1) + elz *\
                             (self.nelx + 1) * (self.nely + 1))
                 if self.desvars[_y, _x] > 0:
-                    B = np.array(self.Be.copy().subs({x:_x, y:_y, z:_z})).astype('double')
+                    B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
                     strain_vec = np.dot(B, self.d[e2sdofmap])
                     stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
                     self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
@@ -676,12 +680,12 @@ class TopologyGen:
         """
         K = self.K.copy()
         self.remove_list = self._rcfixed.copy()
-
-        loads = split(self.loaddof, self.nelx, self.nely, self.nelz)
+        
+        loads = split_loads(self.loaddof, self.nelx, self.nely, self.nelz, self.dofpn)
 
         for l in loads:
             self.desvars = get_path(self.desvars,
-                    split(self.fixdof, self.nelx, self.nely, self.nelz), 
+                    split(self.fixdof, self.nelx, self.nely, self.nelz, self.dofpn), 
                     active_points(self.actv, self.nelx, self.nely, self.nelz), 
                     passive_points(self.pasv, self.nelx, self.nely, self.nelz), 
                     l)

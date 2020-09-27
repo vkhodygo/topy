@@ -16,9 +16,9 @@ import itertools
 
 import numpy as np
 
-__all__ = ['split', 'get_path', 'active_points', 'passive_points']
+__all__ = ['split', 'get_path', 'active_points', 'passive_points', 'split_loads']
 
-def split(array, nelx, nely, nelz):
+def split(array, nelx, nely, nelz, dof):
     """
     Splits an array of boundary conditions into an array of collections of
     elements. Boundary conditions that are more than one node in size are
@@ -31,16 +31,29 @@ def split(array, nelx, nely, nelz):
     array.sort()
     
     nlist = []
-    tmp = _get_elem(array[0], nelx, nely, nelz)
+    tmp = _get_elem(array[0], nelx, nely, nelz, dof)
     for i in range(1, len(array)):
         if _neighbors_node(array[i-1], array[i], nelx, nely, nelz):
-            tmp = tmp.union(_get_elem(array[i], nelx, nely, nelz))
+            tmp = tmp.union(_get_elem(array[i], nelx, nely, nelz, dof))
         else:
             nlist.append(list(tmp))
-            tmp = _get_elem(array[i], nelx, nely, nelz)
+            tmp = _get_elem(array[i], nelx, nely, nelz, dof)
 
     nlist.append(list(tmp))
     return nlist
+
+def split_loads(loads, nelx, nely, nelz, dof):
+    """
+    Transforms every node into an array of element points.
+    """
+    loads = set(np.floor(np.asarray(loads)/dof).astype(int))
+    loads = np.asarray(list(loads))*dof
+
+    load_elems = []
+    for l in loads:
+        load_elems.append(list(_get_elem(l, nelx, nely, nelz, dof)))
+
+    return load_elems
 
 def active_points(array, nelx, nely, nelz):
     """
@@ -87,13 +100,13 @@ def dist_elem(e1, e2, nelx, nely, nelz):
 
     return np.linalg.norm(np.asarray(p1) - np.asarray(p2))
 
-def dist_node(n1, n2, nelx, nely, nelz):
+def dist_node(n1, n2, nelx, nely, nelz, dof):
     """
     Returns the distance between two nodes. Used to define which active
     elements are associated to which loads.
     """
-    p1 = node2point(n1, nelx, nely, nelz)
-    p2 = node2point(n2, nelx, nely, nelz)
+    p1 = node2point(n1, nelx, nely, nelz, dof)
+    p2 = node2point(n2, nelx, nely, nelz, dof)
 
     return np.linalg.norm(np.asarray(p1) - np.asarray(p2))
 
@@ -140,16 +153,16 @@ def elem2point(e1, nelx, nely, nelz):
 
     return p1
 
-def node2point(n, nelx, nely, nelz):
+def node2point(n, nelx, nely, nelz, dof):
     """
     Converts node's DOF data to an element point (equivalent to the element to
     its lower right).
     """
     if nelz == 0:
-        e = int(np.floor(n/2))
+        e = int(np.floor(n/dof))
         return elem2point(e, nelx + 1, nely + 1, 0)
     else:
-        e = int(np.floor(n/3))
+        e = int(np.floor(n/dof))
         return elem2point(e, nelx + 1, nely + 1, nelz + 1)
 
 
@@ -294,14 +307,14 @@ def _neighbors_elem(e1, e2, nelx, nely, nelz):
                diff == plane
 
 
-def _get_elem(n, nelx, nely, nelz):
+def _get_elem(n, nelx, nely, nelz, dof):
     """
     Transforms a node into a set of element points.
     """
     eset = {}
     if nelz == 0:
         e = [0]*4
-        e[0] = node2point(n, nelx, nely, nelz) 
+        e[0] = node2point(n, nelx, nely, nelz, dof) 
         e[1] = (min(e[0][0], nely-1), max(e[0][1]-1,    0))
         e[2] = (max(e[0][0]-1,    0), min(e[0][1], nelx-1))
         e[3] = (max(e[0][0]-1,    0), max(e[0][1]-1,    0))
@@ -310,7 +323,7 @@ def _get_elem(n, nelx, nely, nelz):
         eset = set(e)
     else:
         e = [0]*8
-        e[0] = node2point(n, nelx, nely, nelz) 
+        e[0] = node2point(n, nelx, nely, nelz, dof) 
         e[1] = (min(e[0][0], nelz-1), min(e[0][1], nely-1), max(e[0][2]-1,    0))
         e[2] = (min(e[0][0], nelz-1), max(e[0][1]-1,    0), min(e[0][2], nelx-1))
         e[3] = (min(e[0][0], nelz-1), max(e[0][1]-1,    0), max(e[0][2]-1,    0))
