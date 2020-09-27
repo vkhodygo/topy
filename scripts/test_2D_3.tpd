@@ -4,9 +4,9 @@
 
 TO_TYPE:     gen          # or trad, for traditional approach
 
-ELEM_E:      210          # GPa
-ELEM_NU:     0.3
-ELEM_TC:     49.8         # W/(m*K)
+ELEM_E:      186          # GPa
+ELEM_NU:     0.29
+ELEM_TC:     51.9         # W/(m*K)
 ELEM_L:      5            # mm (half-length of element)
 THICKNESS  : 10	          # mm
 
