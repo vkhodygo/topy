@@ -71,7 +71,7 @@ def create_K(_L, _E, _nu, _k, _t):
 
     # Convert SymPy Matrix to NumPy array:
     K = _t * array(Kbar.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
-    B = B.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu})
+    B = B.subs({a:_a, b:_b, E:_E, nu:_nu})
     C = array(C.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
 
     # Set small (<< 0) values equal to zero:

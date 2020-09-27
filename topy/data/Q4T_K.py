@@ -56,7 +56,7 @@ def create_K(_L, _E, _nu, _k, _t):
 
     # Convert SymPy Matrix to NumPy array:
     K = _t * array(K.subs({a:_a, b:_b, k:_k})).astype('double')
-    B = B.subs({a:_a, b:_b, c:_c, k:_k})
+    B = B.subs({a:_a, b:_b, k:_k})
     C = array(C.subs({a:_a, b:_b, k:_k})).astype('double')
 
     # Set small (<< 0) values equal to zero:
