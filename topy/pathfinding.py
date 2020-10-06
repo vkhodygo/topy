@@ -33,7 +33,7 @@ def split(array, nelx, nely, nelz, dof):
     nlist = []
     tmp = _get_elem(array[0], nelx, nely, nelz, dof)
     for i in range(1, len(array)):
-        if _neighbors_node(array[i-1], array[i], nelx, nely, nelz):
+        if _neighbors_node(array[i-1], array[i], nelx, nely, nelz, dof):
             tmp = tmp.union(_get_elem(array[i], nelx, nely, nelz, dof))
         else:
             nlist.append(list(tmp))
@@ -262,50 +262,29 @@ def get_path(mesh, supports, active, passive, load):
 
     return mesh
 
-def _neighbors_node(n1, n2, nelx, nely, nelz):
+def _neighbors_node(n1, n2, nelx, nely, nelz, dof):
     """
     Checks if two nodes are neighboring.
     """
+    p1 = node2point(n1, nelx, nely, nelz, dof)
+    p2 = node2point(n2, nelx, nely, nelz, dof)
     if nelz == 0:
-        n1 = int(np.floor(n1/2)) + 1
-        n2 = int(np.floor(n2/2)) + 1
+        return abs(p1[0] - p2[0]) <= 1 and\
+               abs(p1[1] - p2[1]) <= 1
     else:
-        n1 = int(np.floor(n1/3)) + 1
-        n2 = int(np.floor(n2/3)) + 1
-    diff = abs(n2 - n1)
-    plane = (nelx + 1)*(nely + 1)
-    if nelz == 0:
-        return diff == 0 or \
-               diff == 1 or \
-               diff == nely or \
-               diff == nely + 1 or \
-               diff == nely - 1
-    else:
-        return diff == 0 or \
-               diff == 1 or \
-               diff == nely or \
-               diff == nely + 1 or \
-               diff == nely - 1 or \
-               diff == plane or \
-               diff == plane + 1 or \
-               diff == plane - 1
+        return abs(p1[0] - p2[0]) <= 1 and\
+               abs(p1[1] - p2[1]) <= 1 and\
+               abs(p1[2] - p2[2]) <= 1
 
-def _neighbors_elem(e1, e2, nelx, nely, nelz):
+def _neighbors_elem(e1, e2, nelx, nely, nelz, dof):
     """
     Checks if two elements are neighboring.
     """
-    diff = abs(e1 - e2)
-    if nelz == 0:
-        return diff == 0 or \
-               diff == 1 or \
-               diff == nely
-    else:
-        plane = nely*nelx
-        return diff == 0 or \
-               diff == 1 or \
-               diff == nely or \
-               diff == plane
+    p1 = np.asarray(elem2point(e1, nelx, nely, nelz, dof))
+    p2 = np.asarray(elem2point(e2, nelx, nely, nelz, dof))
 
+    # Check if the elements are not on a diagonal and close to each other.
+    return np.linalg.norm(p1 - p2) <= 1
 
 def _get_elem(n, nelx, nely, nelz, dof):
     """
@@ -339,25 +318,41 @@ def _get_elem(n, nelx, nely, nelz, dof):
 
 def _get_elem_neighbors(p, nelx, nely, nelz):
     """
-    Gets the elements which surround the element in point p1 (no diagonals).
+    Gets the elements which surround the element in point p1.
     """
 
-    eset = {}
+    eset = set([])
     if nelz == 0:
-        e1 = (max(p[0]-1, 0), p[1])
-        e2 = (min(p[0]+1, nely-1), p[1])
-        e3 = (p[0], max(p[1]-1, 0))
-        e4 = (p[0], min(p[1]+1, nelx-1))
+        ymin = max(p[0]-1, 0)
+        ymax = min(p[0]+1, nely-1)
+        xmin = max(p[1]-1, 0)
+        xmax = min(p[1]+1, nelx-1)
+        y = ymin
+        while y <= ymax:
+            x = xmin
+            while x <= xmax:
+                if (y, x) != p:
+                    eset.add((y, x))
+                x += 1
+            y += 1
 
-        eset = {e1, e2, e3, e4}
     else:
-        e1 = (max(p[0]-1, 0), p[1], p[2])
-        e2 = (min(p[0]+1, nelz-1), p[1], p[2])
-        e3 = (p[0], max(p[1]-1, 0), p[2])
-        e4 = (p[0], min(p[1]+1, nely-1), p[2])
-        e5 = (p[0], p[1], max(p[2]-1, 0))
-        e6 = (p[0], p[1], min(p[2]+1, nelx-1))
-
-        eset = {e1, e2, e3, e4, e5, e6}
+        zmin = max(p[0]-1, 0)
+        zmax = min(p[0]+1, nelz-1)
+        ymin = max(p[1]-1, 0)
+        ymax = min(p[1]+1, nely-1)
+        xmin = max(p[2]-1, 0)
+        xmax = min(p[2]+1, nelx-1)
+        z = zmin
+        while z <= zmax:
+            y = ymin
+            while y <= ymax:
+                x = xmin
+                while x <= xmax:
+                    if (z, y, x) != p:
+                        eset.add((z, y, x))
+                    x += 1
+                y += 1
+            z += 1
 
     return list(eset)

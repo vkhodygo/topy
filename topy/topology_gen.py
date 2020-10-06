@@ -67,6 +67,7 @@ class TopologyGen:
         if self.probtype != "heat":
             logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
             self.expand()
+        self.desvars = self.volfrac*self.desvars
         Kfree = self.preprocessK()
 
         return Kfree
@@ -360,7 +361,11 @@ class TopologyGen:
                             (_y + _x * (self.nely + 1))
                 if self.desvars[_y, _x] > 0:
                     B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
-                    strain_vec = np.dot(B, self.d[e2sdofmap])
+                    if self.probtype == 'comp' or self.probtype == 'heat':
+                        strain_vec = np.dot(B, self.d[e2sdofmap])
+                    elif self.probtype == 'mech':
+                        strain_vec = np.dot(B, self.d[e2sdofmap])
+
                     stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
                     if self.probtype == 'comp' or self.probtype == 'mech':
                         self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
@@ -378,7 +383,7 @@ class TopologyGen:
                 e2sdofmap = self.e2sdofmapi + self.dofpn *\
                             (ely + elx * (self.nely + 1) + elz *\
                             (self.nelx + 1) * (self.nely + 1))
-                if self.desvars[_y, _x] > 0:
+                if self.desvars[_z, _y, _x] > 0:
                     B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
                     strain_vec = np.dot(B, self.d[e2sdofmap])
                     stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
@@ -682,13 +687,18 @@ class TopologyGen:
         self.remove_list = self._rcfixed.copy()
         
         loads = split_loads(self.loaddof, self.nelx, self.nely, self.nelz, self.dofpn)
+        fixed = split(self.fixdof, self.nelx, self.nely, self.nelz, self.dofpn)
+        active = active_points(self.actv, self.nelx, self.nely, self.nelz)
+        passive = passive_points(self.pasv, self.nelx, self.nely, self.nelz)
 
         for l in loads:
-            self.desvars = get_path(self.desvars,
-                    split(self.fixdof, self.nelx, self.nely, self.nelz, self.dofpn), 
-                    active_points(self.actv, self.nelx, self.nely, self.nelz), 
-                    passive_points(self.pasv, self.nelx, self.nely, self.nelz), 
-                    l)
+            self.desvars = get_path(self.desvars, fixed, active, passive, l)
+
+        if self.probtype == 'mech':
+            loads_out = split_loads(self.loaddofout, self.nelx, self.nely, self.nelz, self.dofpn)
+            for lo in loads_out:
+                self.desvars = get_path(self.desvars, loads, active, passive, lo)
+                self.desvars = get_path(self.desvars, fixed, active, passive, lo)
 
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
@@ -807,7 +817,7 @@ class TopologyGen:
                 for ely in range(self.nely):
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
                     (ely + elx * (self.nely + 1))
-                    if self.desvars[ely, elx] == SOLID:
+                    if self.desvars[ely, elx] > 0:
                         updatedKe = self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
