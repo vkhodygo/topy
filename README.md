@@ -37,7 +37,7 @@ Once you've downloaded the dependencies, all you need to do is the following:
 ```bash
 $ git clone https://github.com/thebeachlab/topy.git
 $ cd topy/topy
-$ python setup.py install
+$ (sudo) python setup.py install
 ```
 If there aren't any errors, then ToPy is installed. Congratulations!
 
