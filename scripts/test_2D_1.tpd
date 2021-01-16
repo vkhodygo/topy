@@ -24,7 +24,8 @@ LOAD_VALU_Y: -2000       # N
 
 # End conditions
 NUM_ITER   : 50
-STRESS_MAX : 100         # MPa
+NORMAL_MAX : 100         # MPa
+SHEAR_MAX  : 100         # MPa
 VOL_FRAC   : 0.50
 
 # Grey-scale filter (GSF)

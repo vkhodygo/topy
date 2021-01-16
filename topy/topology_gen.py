@@ -144,7 +144,8 @@ class TopologyGen:
         self.Be = self.topydict['ELEM_B'] #  Element strain interpolation matrix
         self.Ce = self.topydict['ELEM_C'] #  Element linear elastic modulus matrix
         self.K = self.topydict['K'] #  Global stiffness matrix
-        self.Smax = self.topydict['STRESS_MAX'] # Maximum stress allowed
+        self.Smax = self.topydict['NORMAL_MAX'] # Maximum stress allowed
+        self.Tmax = self.topydict['SHEAR_MAX'] # Maximum stress allowed
         if self.nelz:
             logger.info('Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x ' + \
                 'NUM_ELEM_Z) = %d x %d x %d' % (self.nelx, self.nely, self.nelz))

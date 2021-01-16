@@ -255,7 +255,8 @@ def _parsev2020file(s):
         d['DOF_PN'] = int(d['DOF_PN'])
         d['ETA'] = str(d['ETA']).lower()
         d['ELEM_TYPE'] = d['ELEM_K']
-        d['STRESS_MAX'] = float(d['STRESS_MAX'])*1e6
+        d['NORMAL_MAX'] = float(d['NORMAL_MAX'])*1e6
+        d['SHEAR_MAX'] = float(d['SHEAR_MAX'])*1e6
     except:
         raise ValueError('One or more parameters incorrectly specified.')
 
