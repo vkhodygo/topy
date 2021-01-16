@@ -788,14 +788,8 @@ class TopologyGen:
                         h += h % 2 # Make h even
                         umin = int(np.maximum(elx - h/2, 0))
                         umax = int(np.minimum(elx + h/2 + 1, self.nelx))
-                        if umax - umin < h and not warn_width:
-                            logger.info("Warning: design space may have insufficient width.")
-                            warn_width = True
                         vmin = int(np.maximum(ely - h/2, 0))
                         vmax = int(np.minimum(ely + h/2 + 1, self.nely))
-                        if vmax - vmin < h and not warn_height:
-                            logger.info("Warning: design space may have insufficient height.")
-                            warn_height = True
                         for i in range(umin, umax):
                             for j in range(vmin, vmax):
                                 if (i-elx)**2 + (j-ely)**2 <= (h/2)**2:
