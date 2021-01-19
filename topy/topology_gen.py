@@ -370,6 +370,7 @@ class TopologyGen:
         if self.probtype == 'mech':  # 'adjoint' vectors
             self.dout[self.freedof] = self.dfreeout
 
+        # The following part does not really make sense for heat problems
         if self.probtype == 'heat':
             self.itercount += 1
             return
@@ -393,7 +394,7 @@ class TopologyGen:
                             _xn = t[0]
                             _yn = t[1]
                             B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
-                            if self.probtype == 'comp' or self.probtype == 'heat':
+                            if self.probtype == 'comp':
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
                             elif self.probtype == 'mech':
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
@@ -432,7 +433,7 @@ class TopologyGen:
                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                 (_y + _x * (self.nely + 1))
                     B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
-                    if self.probtype == 'comp' or self.probtype == 'heat':
+                    if self.probtype == 'comp':
                         strain_vec = np.dot(B, self.d[e2sdofmap])
                     elif self.probtype == 'mech':
                         strain_vec = np.dot(B, self.d[e2sdofmap])
@@ -441,8 +442,6 @@ class TopologyGen:
                     
                     if self.probtype == 'comp' or self.probtype == 'mech':
                         self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
-                    elif self.probtype == 'heat':
-                        self.stress_mat[_y, _x] = np.linalg.norm(stress_vec)
 
         else:
             x, y, z = symbols("x y z")
