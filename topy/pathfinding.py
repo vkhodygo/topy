@@ -212,7 +212,7 @@ def get_path(mesh, supports, active, passive, load):
                 neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
                 for n in neighbors:
                     if n not in passive:
-                        heapq.heappush(queue_a, (dist(e[1].elem, n) + shortest_dist(a, n), PathNode(n, e)))
+                        heapq.heappush(queue_a, (shortest_dist(a, n), PathNode(n, e)))
                 e = heapq.heappop(queue_a)
 
             queue_a = []
@@ -230,7 +230,7 @@ def get_path(mesh, supports, active, passive, load):
                     neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
                     for n in neighbors:
                         if n not in passive:
-                            heapq.heappush(queue_s, (dist(e[1].elem, n) + shortest_dist(s, n), PathNode(n, e)))
+                            heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
                     e = heapq.heappop(queue_s)
 
                 while e != None:
@@ -253,7 +253,7 @@ def get_path(mesh, supports, active, passive, load):
                 neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
                 for n in neighbors:
                     if n not in passive:
-                        heapq.heappush(queue_s, (dist(e[1].elem, n) + shortest_dist(s, n), PathNode(n, e)))
+                        heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
                 e = heapq.heappop(queue_s)
 
             while e != None:
@@ -318,41 +318,26 @@ def _get_elem(n, nelx, nely, nelz, dof):
 
 def _get_elem_neighbors(p, nelx, nely, nelz):
     """
-    Gets the elements which surround the element in point p1.
+    Gets the elements which surround the element in point p1 (no diagonals).
     """
 
-    eset = set([])
+    eset = {}
     if nelz == 0:
-        ymin = max(p[0]-1, 0)
-        ymax = min(p[0]+1, nely-1)
-        xmin = max(p[1]-1, 0)
-        xmax = min(p[1]+1, nelx-1)
-        y = ymin
-        while y <= ymax:
-            x = xmin
-            while x <= xmax:
-                if (y, x) != p:
-                    eset.add((y, x))
-                x += 1
-            y += 1
+        e1 = (max(p[0]-1, 0), p[1])
+        e2 = (min(p[0]+1, nely-1), p[1])
+        e3 = (p[0], max(p[1]-1, 0))
+        e4 = (p[0], min(p[1]+1, nelx-1))
 
+        eset = {e1, e2, e3, e4}
     else:
-        zmin = max(p[0]-1, 0)
-        zmax = min(p[0]+1, nelz-1)
-        ymin = max(p[1]-1, 0)
-        ymax = min(p[1]+1, nely-1)
-        xmin = max(p[2]-1, 0)
-        xmax = min(p[2]+1, nelx-1)
-        z = zmin
-        while z <= zmax:
-            y = ymin
-            while y <= ymax:
-                x = xmin
-                while x <= xmax:
-                    if (z, y, x) != p:
-                        eset.add((z, y, x))
-                    x += 1
-                y += 1
-            z += 1
+        e1 = (max(p[0]-1, 0), p[1], p[2])
+        e2 = (min(p[0]+1, nelz-1), p[1], p[2])
+        e3 = (p[0], max(p[1]-1, 0), p[2])
+        e4 = (p[0], min(p[1]+1, nely-1), p[2])
+        e5 = (p[0], p[1], max(p[2]-1, 0))
+        e6 = (p[0], p[1], min(p[2]+1, nelx-1))
+
+        eset = {e1, e2, e3, e4, e5, e6}
 
     return list(eset)
+
