@@ -276,12 +276,12 @@ def _neighbors_node(n1, n2, nelx, nely, nelz, dof):
                abs(p1[1] - p2[1]) <= 1 and\
                abs(p1[2] - p2[2]) <= 1
 
-def _neighbors_elem(e1, e2, nelx, nely, nelz, dof):
+def _neighbors_elem(e1, e2, nelx, nely, nelz):
     """
     Checks if two elements are neighboring.
     """
-    p1 = np.asarray(elem2point(e1, nelx, nely, nelz, dof))
-    p2 = np.asarray(elem2point(e2, nelx, nely, nelz, dof))
+    p1 = np.asarray(elem2point(e1, nelx, nely, nelz))
+    p2 = np.asarray(elem2point(e2, nelx, nely, nelz))
 
     # Check if the elements are not on a diagonal and close to each other.
     return np.linalg.norm(p1 - p2) <= 1
