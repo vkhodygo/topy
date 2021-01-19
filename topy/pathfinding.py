@@ -212,7 +212,7 @@ def get_path(mesh, supports, active, passive, load):
                 neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
                 for n in neighbors:
                     if n not in passive:
-                        heapq.heappush(queue_a, (shortest_dist(a, n), PathNode(n, e)))
+                        heapq.heappush(queue_a, (dist(e[1].elem, n) + shortest_dist(a, n), PathNode(n, e)))
                 e = heapq.heappop(queue_a)
 
             queue_a = []
@@ -230,7 +230,7 @@ def get_path(mesh, supports, active, passive, load):
                     neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
                     for n in neighbors:
                         if n not in passive:
-                            heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
+                            heapq.heappush(queue_s, (dist(e[1].elem, n) + shortest_dist(s, n), PathNode(n, e)))
                     e = heapq.heappop(queue_s)
 
                 while e != None:
@@ -253,7 +253,7 @@ def get_path(mesh, supports, active, passive, load):
                 neighbors = _get_elem_neighbors(e[1].elem, nelx, nely, nelz)
                 for n in neighbors:
                     if n not in passive:
-                        heapq.heappush(queue_s, (shortest_dist(s, n), PathNode(n, e)))
+                        heapq.heappush(queue_s, (dist(e[1].elem, n) + shortest_dist(s, n), PathNode(n, e)))
                 e = heapq.heappop(queue_s)
 
             while e != None:
