@@ -15,6 +15,7 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import linalg
 from sympy import symbols
+from mumps import DMumpsContext
 
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
@@ -204,7 +205,7 @@ class TopologyGen:
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
         self.r = np.zeros_like(self.alldof, dtype=np.float32) #  Load vector
         self.r[self.loaddof] = self.loadval #  Assign load values at loaded dof
-        self.rfree = np.asarray(self.r[self.freedof], dtype=np.float32) #  Modified load vector (free dof)
+        self.rfree = np.asarray(self.r[self.freedof], dtype=np.double) #  Modified load vector (free dof)
         self.d = np.zeros_like(self.r) #  Displacement vector
         self.dfree = np.zeros_like(self.rfree) #  Modified load vector (free dof)
         # Determine which rows and columns must be deleted from global K:
@@ -276,7 +277,7 @@ class TopologyGen:
 
             self.rout = np.zeros_like(self.alldof).astype(float)
             self.rout[self.loaddofout] = self.loadvalout
-            self.rfreeout = np.array(self.rout[self.freedof], dtype=np.float32)
+            self.rfreeout = np.array(self.rout[self.freedof], dtype=np.double)
             self.dout = np.zeros_like(self.rout)
             self.dfreeout = np.zeros_like(self.rfreeout)
             ksin = np.ones(self.loaddof.shape, dtype='int') * KDATUM
@@ -314,19 +315,40 @@ class TopologyGen:
         removed = self.remove_list[self._rcfixed].copy()
 
         if self.dofpn < 3 and self.nelz == 0: #  Direct solver
+            # MUMPS with PyMumps
+            # Kfree = sparse.coo_matrix(Kfree)
+            # ctx = DMumpsContext(par=1, sym=0, comm=None)
+            # if ctx.myid == 0:
+            #     ctx.set_silent()
+            #     ctx.set_centralized_sparse(Kfree)
+            #     ctx.run(job=4) # Analysis + Factorization
+
+            #     x = self.rfree[removed].copy()
+            #     ctx.set_rhs(x) # Modified in place
+            #     self.dfree[removed] = x
+            #     ctx.run(job=3) # Solve
+
+            #     if self.probtype == 'mech':
+            #         x = self.rfreeout[removed].copy()
+            #         ctx.set_rhs(x) # Modified in place
+            #         self.dfreeout[removed] = x
+            #         ctx.run(job=3) # Solve
+
+            # ctx.destroy() # Cleanup
+
             Kfree = sparse.csc_matrix(Kfree)
             lu = linalg.splu(Kfree)
             self.dfree[removed] = lu.solve(self.rfree[removed])
             if self.probtype == 'mech':
                 self.dfreeout[removed] = lu.solve(self.rfreeout[removed])
-        else: #  Iterative solver for 3D problems
+        else: # 3D problem
+            # ToPy's original implementation used Preconditioned Conjugate Gradient (PCG) from PySparse.
+            # SciPy's implementation (linalg.cg) didn't converge. This was the first function that
+            # managed to converge, but it is pretty slow.
             Kfree = sparse.csc_matrix(Kfree, dtype=np.float32)
             lu = linalg.splu(Kfree)
             preK_x = lambda x: lu.solve(np.asarray(x, dtype=np.float32))
             preK = linalg.LinearOperator(Kfree.shape, preK_x)
-            # ToPy's original implementation used Preconditioned Conjugate Gradient (PCG) from PySparse.
-            # SciPy's implementation (linalg.cg) didn't converge. This was the first function that
-            # managed to converge, but it is pretty slow.
             self.dfree, info = linalg.minres(Kfree, self.rfree, tol=1e-8, maxiter=8000, M=preK)
             if info > 0:
                 logger.error('Solver error: Number of iterations: {}.'.format(info))
