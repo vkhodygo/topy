@@ -172,8 +172,6 @@ class TopologyGen:
             self.numiter = MAX_ITERS
 
         self.stress = 0.0 # Current maximum stress
-        self.strain = 0.0 # Current maximum strain
-        self.disp   = 0.0 # Current maximum displacement
 
         # All DOF vector and design variables arrays:
         # This needs to be recoded at some point, perhaps. I originally
@@ -187,20 +185,24 @@ class TopologyGen:
                     (self.nely + 1))
                 self.desvars = np.zeros((self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nely, self.nelx))
+                self.h_n = np.zeros((self.nely+1, self.nelx+1))
             else:
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1) * (self.nelz + 1))
                 self.desvars = np.zeros((self.nelz, self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
+                self.h_n = np.zeros((self.nelz+1, self.nely+1, self.nelx+1))
         elif self.dofpn == 2:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
             self.desvars = np.zeros((self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nely, self.nelx))
+            self.h_n = np.zeros((self.nely+1, self.nelx+1))
         else:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) *\
                 (self.nely + 1) * (self.nelz + 1))
             self.desvars = np.zeros((self.nelz, self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
+            self.h_n = np.zeros((self.nelz+1, self.nely+1, self.nelx+1))
         self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
         self.r = np.zeros_like(self.alldof, dtype=np.float32) #  Load vector
@@ -372,17 +374,63 @@ class TopologyGen:
             self.itercount += 1
             return
 
-        # Calculate strain and stress values:
         _L = self.topydict['ELEM_L']
+        # Calculate h values for first run
+        if self.stress == 0.0:
+            if self.dofpn < 3 and self.nelz == 0:
+                x, y = symbols("x y")
+                num_elem = self.nelx * self.nely
+                _x = 0
+                _y = 0
+                for i in range(num_elem):
+                    _x = int(np.floor(i / self.nely))
+                    _y = i % self.nely
+                    if self.desvars[_y, _x] > 0:
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (_y + _x * (self.nely + 1))
+                        nodes = [(_x, _y), (_x+1,_y), (_x,_y+1), (_x+1,_y+1)]
+                        for t in nodes:
+                            _xn = t[0]
+                            _yn = t[1]
+                            B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
+                            if self.probtype == 'comp' or self.probtype == 'heat':
+                                strain_vec = np.dot(B, self.d[e2sdofmap])
+                            elif self.probtype == 'mech':
+                                strain_vec = np.dot(B, self.d[e2sdofmap])
+
+                            s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
+                            self.h_n[_yn, _xn] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
+
+            else:
+                x, y, z = symbols("x y z")
+                num_elem = self.nelx * self.nely * self.nelz
+                for i in range(num_elem):
+                    _z = int(np.floor(i / (self.nely * self.nelx)))
+                    rest = i % (self.nely * self.nelx)
+                    _x = int(np.floor(rest / self.nely))
+                    _y = rest % self.nely
+                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                (ely + elx * (self.nely + 1) + elz *\
+                                (self.nelx + 1) * (self.nely + 1))
+                    if self.desvars[_z, _y, _x] > 0:
+                        B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
+                        strain_vec = np.dot(B, self.d[e2sdofmap])
+                        stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
+                        self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
+
+
+        # Calculate strain and stress values:
         if self.dofpn < 3 and self.nelz == 0:
             x, y = symbols("x y")
             num_elem = self.nelx * self.nely
+            _x = 0
+            _y = 0
             for i in range(num_elem):
                 _x = int(np.floor(i / self.nely))
                 _y = i % self.nely
-                e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                            (_y + _x * (self.nely + 1))
                 if self.desvars[_y, _x] > 0:
+                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                (_y + _x * (self.nely + 1))
                     B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
                     if self.probtype == 'comp' or self.probtype == 'heat':
                         strain_vec = np.dot(B, self.d[e2sdofmap])
@@ -390,6 +438,7 @@ class TopologyGen:
                         strain_vec = np.dot(B, self.d[e2sdofmap])
 
                     stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
+                    
                     if self.probtype == 'comp' or self.probtype == 'mech':
                         self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
                     elif self.probtype == 'heat':
@@ -397,7 +446,7 @@ class TopologyGen:
 
         else:
             x, y, z = symbols("x y z")
-            num_elem = self.nelx * self.nely
+            num_elem = self.nelx * self.nely * self.nelz
             for i in range(num_elem):
                 _z = int(np.floor(i / (self.nely * self.nelx)))
                 rest = i % (self.nely * self.nelx)
@@ -803,24 +852,26 @@ class TopologyGen:
         warn_width = False
         warn_height = False
         if self.nelz == 0: #  2D problem
-            for elx in range(self.nelx):
-                for ely in range(self.nely):
-                    if self.stress_mat[ely, elx] > 0:
-                        h = np.ceil(np.sqrt(self.stress_mat[ely, elx]/self.Smax))
+            for nlx in range(self.nelx+1):
+                for nly in range(self.nely+1):
+                    if self.h_n[nly, nlx] > 0:
+                        h = np.ceil(self.h_n[nly, nlx])
                         h += h % 2 # Make h even
-                        umin = int(np.maximum(elx - h/2, 0))
-                        umax = int(np.minimum(elx + h/2 + 1, self.nelx))
-                        vmin = int(np.maximum(ely - h/2, 0))
-                        vmax = int(np.minimum(ely + h/2 + 1, self.nely))
+
+                        # create "box" repositioning the center into the node
+                        umin = int(np.maximum(nlx - 0.5 - h/2, 0))
+                        umax = int(np.minimum(nlx - 0.5 + h/2 + 1, self.nelx))
+                        vmin = int(np.maximum(nly - 0.5 - h/2, 0))
+                        vmax = int(np.minimum(nly - 0.5 + h/2 + 1, self.nely))
                         for i in range(umin, umax):
                             for j in range(vmin, vmax):
-                                if (i-elx)**2 + (j-ely)**2 <= (h/2)**2:
+                                if (i-nlx+0.5)**2 + (j-nly+0.5)**2 <= (h/2)**2:
                                     self.desvars[j, i] = SOLID
                         #print(self.desvars[vmin:vmax, umin:umax])
         else: #  3D problem
-            for elz in range(self.nelz):
-                for elx in range(self.nelx):
-                    for ely in range(self.nely):
+            for nlz in range(self.nelz+1):
+                for nlx in range(self.nelx+1):
+                    for nly in range(self.nely+1):
                         print()
 
     def preprocessK(self):
