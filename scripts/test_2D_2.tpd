@@ -7,11 +7,11 @@ TO_TYPE:     gen          # or trad, for traditional approach
 ELEM_E:      186          # GPa
 ELEM_NU:     0.29
 ELEM_TC:     51.9         # W/(m*K)
-ELEM_L:      5            # mm (half-length of element)
-THICKNESS  : 10	          # mm
+ELEM_L:      50           # mm (half-length of element)
+THICKNESS:   50	          # mm
 
 PROB_TYPE:   comp
-PROB_NAME:   test_1
+PROB_NAME:   test_2
 DOF_PN:      2
 ELEM_K:      Q4
 NUM_ELEM_X:  60
@@ -20,13 +20,13 @@ NUM_ELEM_Z:  0
 FXTR_NODE_X: 21
 FXTR_NODE_Y: 21;2481
 LOAD_NODE_Y: 1251
-LOAD_VALU_Y: -3000       # N
+LOAD_VALU_Y: -7000       # N
 
 # End conditions
 NUM_ITER   : 50
 NORMAL_MAX : 100         # MPa
 SHEAR_MAX  : 100         # MPa
-VOL_FRAC   : 0.50
+VOL_FRAC   : 0.40
 
 # Grey-scale filter (GSF)
 P_FAC      : 3
