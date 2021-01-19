@@ -855,7 +855,7 @@ class TopologyGen:
                 for nly in range(self.nely+1):
                     if self.h_n[nly, nlx] > 0:
                         h = np.ceil(self.h_n[nly, nlx])
-                        h += h % 2 # Make h even
+                        h += h % 2 # Make h even -> makes resulting structures both safer and more aesthetically pleasing
 
                         # create "box" repositioning the center into the node
                         umin = int(np.maximum(nlx - 0.5 - h/2, 0))
@@ -868,9 +868,9 @@ class TopologyGen:
                                     self.desvars[j, i] = SOLID
                         #print(self.desvars[vmin:vmax, umin:umax])
         else: #  3D problem
-            for nlz in range(self.nelz+1):
-                for nlx in range(self.nelx+1):
-                    for nly in range(self.nely+1):
+            for nlz in range(self.nelz):
+                for nly in range(self.nely):
+                    for nlx in range(self.nelx):
                         print()
 
     def preprocessK(self):
