@@ -752,9 +752,8 @@ class TopologyGen:
     # ===================================
     def createK(self):
         """
-        Update the global stiffness matrix by looking at each element's
-        contribution i.t.o. design domain density and the penalisation factor.
-        Return unconstrained stiffness matrix.
+        Creates a "skeleton" of the topology based on loads and boundary
+        conditions.
 
         """
         K = self.K.copy()
