@@ -915,43 +915,6 @@ class TopologyGen:
         K = K[self.remove_list][:,self.remove_list]
         return K
 
-    def _saint_venant(self):
-        multipliers = np.asarray([[1.0, 0.5, 0.5, 1.0],
-                                  [0.5, 0.0, 0.0, 0.5],
-                                  [0.5, 0.0, 0.0, 0.5],
-                                  [1.0, 0.5, 0.5, 1.0]])
-
-        if self.nelz == 0: #  2D problem
-            nodes = np.floor(self.loaddof / self.dofpn) + 1
-            node_x = (np.floor(nodes / (self.nely + 1))).astype(int)
-            node_y = (nodes % (self.nely + 1)).astype(int) - 1
-
-            umin = np.maximum(node_x - 2, 0)
-            umax = np.minimum(node_x + 2, self.nelx)
-            vmin = np.maximum(node_y - 2, 0)
-            vmax = np.minimum(node_y + 2, self.nely)
-            true_xmin = node_x - 2
-            true_ymin = node_y - 2
-
-            for i in range(len(umin)):
-                xmin = umin[i]
-                xmax = umax[i]
-                ymin = vmin[i]
-                ymax = vmax[i]
-
-                xmin_m = xmin - true_xmin[i] 
-                xmax_m = xmax - true_xmin[i] 
-                ymin_m = ymin - true_ymin[i] 
-                ymax_m = ymax - true_ymin[i] 
-
-                subsm = self.stress_mat[ymin:ymax, xmin:xmax]
-                submult = multipliers[ymin_m:ymax_m, xmin_m:xmax_m]
-
-                self.stress_mat[ymin:ymax, xmin:xmax] = np.multiply(subsm, submult)
-
-        else: #  3D problem
-            print()
-
     # Taken from the PySparse documentation, in order to act as a substitute
     # for the method of the same name it provided for sparse matrices.
     def _update_add_mask_sym(self, A, B, ind, mask):
