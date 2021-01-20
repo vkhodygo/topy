@@ -1,6 +1,8 @@
 [ToPy Problem Definition File v2020]
 
-# Authors: Tarcisio L. de Oliveira
+# Author: Tarcisio L. de Oliveira
+# Provided for purpose of analysis. Does not fully use the
+# new approach (namely the "expansion" phase).
 
 TO_TYPE:     gen          # or trad, for traditional approach
 
@@ -11,7 +13,7 @@ ELEM_L:      5            # mm (half-length of element)
 THICKNESS  : 10	          # mm
 
 PROB_TYPE  : heat
-PROB_NAME  : heat_2d_reci
+PROB_NAME  : 2D_heat
 DOF_PN     : 1
 ELEM_K     : Q4T
 NUM_ITER   : 100
