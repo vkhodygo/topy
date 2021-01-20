@@ -115,6 +115,12 @@ You can use the command line solution:
 $ python topy/scripts/optimise.py <filename>.tpd
 ```
 
+For multi-threaded FEA (in this case, 2 threads): 
+
+```bash
+$ mpirun -n 2 python3 -m mpi4py optimise.py test_3D_1.tpd
+```
+
 Or you can use a Python script:
 
 ```Python

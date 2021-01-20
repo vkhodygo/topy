@@ -29,12 +29,14 @@ def split(array, nelx, nely, nelz, dof):
         return []
 
     array.sort()
+    connected_nodes = [array[0]]
     
     nlist = []
     tmp = _get_elem(array[0], nelx, nely, nelz, dof)
     for i in range(1, len(array)):
-        if _neighbors_node(array[i-1], array[i], nelx, nely, nelz, dof):
+        if _nodes_connected(connected_nodes, array[i], nelx, nely, nelz, dof):
             tmp = tmp.union(_get_elem(array[i], nelx, nely, nelz, dof))
+            connected_nodes.append(array[i])
         else:
             nlist.append(list(tmp))
             tmp = _get_elem(array[i], nelx, nely, nelz, dof)
@@ -262,19 +264,21 @@ def get_path(mesh, supports, active, passive, load):
 
     return mesh
 
+def _nodes_connected(a1, n2, nelx, nely, nelz, dof):
+    for n1 in a1:
+        if _neighbors_node(n1, n2, nelx, nely, nelz, dof):
+            return True
+
+    return False
+
 def _neighbors_node(n1, n2, nelx, nely, nelz, dof):
     """
     Checks if two nodes are neighboring.
     """
-    p1 = node2point(n1, nelx, nely, nelz, dof)
-    p2 = node2point(n2, nelx, nely, nelz, dof)
-    if nelz == 0:
-        return abs(p1[0] - p2[0]) <= 1 and\
-               abs(p1[1] - p2[1]) <= 1
-    else:
-        return abs(p1[0] - p2[0]) <= 1 and\
-               abs(p1[1] - p2[1]) <= 1 and\
-               abs(p1[2] - p2[2]) <= 1
+    p1 = np.array(node2point(n1, nelx, nely, nelz, dof))
+    p2 = np.array(node2point(n2, nelx, nely, nelz, dof))
+    
+    return np.linalg.norm(p1 - p2) <= 1
 
 def _neighbors_elem(e1, e2, nelx, nely, nelz):
     """

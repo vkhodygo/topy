@@ -11,11 +11,12 @@
 import os
 
 import numpy as np
-#from pysparse import superlu, itsolvers, precon
+
 from scipy import sparse
 from scipy.sparse import linalg
 from sympy import symbols
 from mumps import DMumpsContext
+from mpi4py import MPI
 
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
@@ -65,6 +66,7 @@ class TopologyGen:
     def preprocess_space(self):
         if self.probtype != "mech":
             Kfree = self.createK()
+            Kfree = self.preprocessK()
             self.fea(Kfree)
             if self.probtype == "comp":
                 logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
@@ -310,77 +312,114 @@ class TopologyGen:
         See also: set_top_params
 
         """
-        if not self.topydict:
-            raise Exception('You must first load a TPD file!')
-        if self.itercount >= MAX_ITERS:
-            raise Exception('Maximum internal number of iterations exceeded!')
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
 
-        # Kfree = self._updateK(self.K.copy())
+        if rank == 0:
+            if not self.topydict:
+                raise Exception('You must first load a TPD file!')
+            if self.itercount >= MAX_ITERS:
+                raise Exception('Maximum internal number of iterations exceeded!')
 
-        removed = self.remove_list[self._rcfixed].copy()
+            # Kfree = self._updateK(self.K.copy())
 
-        if self.dofpn < 3 and self.nelz == 0: #  Direct solver
-            # MUMPS with PyMumps
-            # Kfree = sparse.coo_matrix(Kfree)
-            # ctx = DMumpsContext(par=1, sym=0, comm=None)
-            # if ctx.myid == 0:
-            #     ctx.set_silent()
-            #     ctx.set_centralized_sparse(Kfree)
-            #     ctx.run(job=4) # Analysis + Factorization
+            removed = self.remove_list[self._rcfixed].copy()
 
-            #     x = self.rfree[removed].copy()
-            #     ctx.set_rhs(x) # Modified in place
-            #     self.dfree[removed] = x
-            #     ctx.run(job=3) # Solve
+        # MUMPS with PyMumps
+        ctx = DMumpsContext(par=1, sym=1, comm=None)
+        ctx.set_icntl(6, 7)
+        ctx.set_silent()
+        if ctx.myid == 0:
+            Kfree_tril= sparse.tril(Kfree.copy(), format='coo')
+            ctx.set_centralized_sparse(Kfree_tril)
 
-            #     if self.probtype == 'mech':
-            #         x = self.rfreeout[removed].copy()
-            #         ctx.set_rhs(x) # Modified in place
-            #         self.dfreeout[removed] = x
-            #         ctx.run(job=3) # Solve
+        ctx.run(job=4) # Analysis + Factorization
 
-            # ctx.destroy() # Cleanup
+        if ctx.myid == 0:
+            x = self.rfree[removed].copy()
+            ctx.set_rhs(x) # Modified in place
 
-            Kfree = sparse.csc_matrix(Kfree)
-            lu = linalg.splu(Kfree)
-            self.dfree[removed] = lu.solve(self.rfree[removed])
+        ctx.run(job=3) # Solve
+
+        if ctx.myid == 0:
+            self.dfree[removed] = x
+
             if self.probtype == 'mech':
-                self.dfreeout[removed] = lu.solve(self.rfreeout[removed])
-        else: # 3D problem
-            # ToPy's original implementation used Preconditioned Conjugate Gradient (PCG) from PySparse.
-            # SciPy's implementation (linalg.cg) didn't converge. This was the first function that
-            # managed to converge, but it is pretty slow.
-            Kfree = sparse.csc_matrix(Kfree, dtype=np.float32)
-            lu = linalg.splu(Kfree)
-            preK_x = lambda x: lu.solve(np.asarray(x, dtype=np.float32))
-            preK = linalg.LinearOperator(Kfree.shape, preK_x)
-            self.dfree, info = linalg.minres(Kfree, self.rfree, tol=1e-8, maxiter=8000, M=preK)
-            if info > 0:
-                logger.error('Solver error: Number of iterations: {}.'.format(info))
-                raise Exception('Solution for FEA did not converge.')
-            else:
-                logger.debug('TgPy: Solution for FEA converged.')
-            if self.probtype == 'mech':  # mechanism synthesis
-                # This was also PCG.
-                self.dfreeout, info = linalg.minres(Kfree, self.rfreeout, tol=1e-8, maxiter=8000, M=preK)
-                if info > 0:
-                    logger.error('Solver error: Number of iterations: {}.'.format(info))
-                    raise Exception('Solution for FEA of adjoint load '
-                                    'case did not converge.')
+                if ctx.myid == 0:
+                    x = self.rfreeout[removed].copy()
+                    ctx.set_rhs(x) # Modified in place
 
-        # Update displacement vectors:
-        self.d[self.freedof] = self.dfree
-        if self.probtype == 'mech':  # 'adjoint' vectors
-            self.dout[self.freedof] = self.dfreeout
+                ctx.run(job=3) # Solve
 
-        # The following part does not really make sense for heat problems
-        if self.probtype == 'heat':
-            self.itercount += 1
-            return
+                if ctx.myid == 0:
+                    self.dfreeout[removed] = x
 
-        _L = self.topydict['ELEM_L']
-        # Calculate h values for first run
-        if self.stress == 0.0 and self.probtype != "mech":
+        ctx.destroy() # Cleanup
+
+
+        if rank == 0:
+            # Update displacement vectors:
+            self.d[self.freedof] = self.dfree
+            if self.probtype == 'mech':  # 'adjoint' vectors
+                self.dout[self.freedof] = self.dfreeout
+
+            # The following part does not really make sense for heat problems
+            if self.probtype == 'heat':
+                self.itercount += 1
+                return
+
+            _L = self.topydict['ELEM_L']
+            # Calculate h values for first run
+            if self.stress == 0.0 and self.probtype != "mech":
+                if self.dofpn < 3 and self.nelz == 0:
+                    x, y = symbols("x y")
+                    num_elem = self.nelx * self.nely
+                    _x = 0
+                    _y = 0
+                    for i in range(num_elem):
+                        _x = int(np.floor(i / self.nely))
+                        _y = i % self.nely
+                        if self.desvars[_y, _x] > 0:
+                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                        (_y + _x * (self.nely + 1))
+                            nodes = [(_x, _y), (_x+1,_y), (_x,_y+1), (_x+1,_y+1)]
+                            for t in nodes:
+                                _xn = t[0]
+                                _yn = t[1]
+                                B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
+                                strain_vec = np.dot(B, self.d[e2sdofmap])
+
+                                s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
+                                self.h_n[_yn, _xn] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
+
+                else:
+                    x, y, z = symbols("x y z")
+                    num_elem = self.nelx * self.nely * self.nelz
+                    for i in range(num_elem):
+                        _z = int(np.floor(i / (self.nely * self.nelx)))
+                        rest = i % (self.nely * self.nelx)
+                        _x = int(np.floor(rest / self.nely))
+                        _y = rest % self.nely
+                        if self.desvars[_z, _y, _x] > 0:
+                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                        (_y + _x * (self.nely + 1) + _z *\
+                                        (self.nelx + 1) * (self.nely + 1))
+                            nodes = [(_x,_y,_z), (_x+1,_y,_z), (_x,_y+1,_z), (_x+1,_y+1,_z),
+                                     (_x,_y,_z+1), (_x+1,_y,_z+1), (_x,_y+1,_z+1), (_x+1,_y+1,_z+1)]
+                            for t in nodes:
+                                _xn = t[0]
+                                _yn = t[1]
+                                _zn = t[2]
+                                B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn), z:(2*_L*_zn)})).astype('double')
+                                strain_vec = np.dot(B, self.d[e2sdofmap])
+
+                                s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
+                                hs = np.sqrt(4*np.amax(s[:3])/(np.pi*self.Smax))
+                                ht = np.sqrt(32*np.amax(s[3:])/(9*np.pi*self.Tmax))
+                                self.h_n[_z, _yn, _xn] = max(hs, ht)
+
+
+            # Calculate strain and stress values:
             if self.dofpn < 3 and self.nelz == 0:
                 x, y = symbols("x y")
                 num_elem = self.nelx * self.nely
@@ -392,18 +431,15 @@ class TopologyGen:
                     if self.desvars[_y, _x] > 0:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (_y + _x * (self.nely + 1))
-                        nodes = [(_x, _y), (_x+1,_y), (_x,_y+1), (_x+1,_y+1)]
-                        for t in nodes:
-                            _xn = t[0]
-                            _yn = t[1]
-                            B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
-                            if self.probtype == 'comp':
-                                strain_vec = np.dot(B, self.d[e2sdofmap])
-                            elif self.probtype == 'mech':
-                                strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
+                        B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
+                        if self.probtype == 'comp':
+                            strain_vec = np.dot(B, self.d[e2sdofmap])
+                        elif self.probtype == 'mech':
+                            strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
-                            s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
-                            self.h_n[_yn, _xn] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
+                        stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
+                        
+                        self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
 
             else:
                 x, y, z = symbols("x y z")
@@ -413,85 +449,44 @@ class TopologyGen:
                     rest = i % (self.nely * self.nelx)
                     _x = int(np.floor(rest / self.nely))
                     _y = rest % self.nely
-                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                (ely + elx * (self.nely + 1) + elz *\
-                                (self.nelx + 1) * (self.nely + 1))
                     if self.desvars[_z, _y, _x] > 0:
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (_y + _x * (self.nely + 1) + _z *\
+                                    (self.nelx + 1) * (self.nely + 1))
                         B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
-                        strain_vec = np.dot(B, self.d[e2sdofmap])
+                        if self.probtype == 'comp':
+                            strain_vec = np.dot(B, self.d[e2sdofmap])
+                        elif self.probtype == 'mech':
+                            strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
+
                         stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
                         self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
 
+            # Maximum stress reached
+            self.stress = np.max(self.stress_mat)
 
-        # Calculate strain and stress values:
-        if self.dofpn < 3 and self.nelz == 0:
-            x, y = symbols("x y")
-            num_elem = self.nelx * self.nely
-            _x = 0
-            _y = 0
-            for i in range(num_elem):
-                _x = int(np.floor(i / self.nely))
-                _y = i % self.nely
-                if self.desvars[_y, _x] > 0:
-                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                (_y + _x * (self.nely + 1))
-                    B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
-                    if self.probtype == 'comp':
-                        strain_vec = np.dot(B, self.d[e2sdofmap])
-                    elif self.probtype == 'mech':
-                        strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
+            # Increment internal iteration counter
+            self.itercount += 1
 
-                    stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
-                    
-                    if self.probtype == 'comp' or self.probtype == 'mech':
-                        self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
-
-        else:
-            x, y, z = symbols("x y z")
-            num_elem = self.nelx * self.nely * self.nelz
-            for i in range(num_elem):
-                _z = int(np.floor(i / (self.nely * self.nelx)))
-                rest = i % (self.nely * self.nelx)
-                _x = int(np.floor(rest / self.nely))
-                _y = rest % self.nely
-                e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                            (ely + elx * (self.nely + 1) + elz *\
-                            (self.nelx + 1) * (self.nely + 1))
-                if self.desvars[_z, _y, _x] > 0:
-                    B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
-                    strain_vec = np.dot(B, self.d[e2sdofmap])
-                    stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
-                    self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
-
-        # # Filter force singularities
-        # if self.itercount >= 0:
-        #     self._saint_venant()
-        
-        # Maximum stress reached
-        self.stress = np.max(self.stress_mat)
-
-        # Increment internal iteration counter
-        self.itercount += 1
-
-        # Display stress map
-        stress_img = self.stress_mat.copy()/self.stress
-        if self.dofpn < 3 and self.nelz == 0:
-            params = {
-                'prefix': self.probname+"_stress",
-                'iternum': self.itercount,
-                'time': 'none',
-                'filetype': 'png',
-                'dir': "iterations"
-            }
-            create_2d_imag(stress_img, **params)
-        else:
-            params = {
-                'prefix': self.probname+"_stress",
-                'iternum': self.itercount,
-                'time': 'none',
-                'dir': "iterations"
-            }
-            create_3d_geom(stress_img, **params)
+            # Display stress map
+            stress_img = self.stress_mat.copy()/self.stress
+            if self.dofpn < 3 and self.nelz == 0:
+                params = {
+                    'prefix': self.probname+"_stress",
+                    'iternum': self.itercount,
+                    'time': 'none',
+                    'filetype': 'png',
+                    'dir': "iterations"
+                }
+                create_2d_imag(stress_img, **params)
+            else:
+                params = {
+                    'prefix': self.probname+"_stress",
+                    'iternum': self.itercount,
+                    'time': 'none',
+                    'dir': "iterations"
+                }
+                create_3d_geom(stress_img, **params)
 
     def filter_sens_sigmund(self):
         """
@@ -868,12 +863,27 @@ class TopologyGen:
                             for j in range(vmin, vmax):
                                 if (i-nlx+0.5)**2 + (j-nly+0.5)**2 <= (h/2)**2:
                                     self.desvars[j, i] = SOLID
-                        #print(self.desvars[vmin:vmax, umin:umax])
+
         else: #  3D problem
             for nlz in range(self.nelz):
                 for nly in range(self.nely):
                     for nlx in range(self.nelx):
-                        print()
+                        if self.h_n[nlz, nly, nlx] > 0:
+                            h = np.ceil(self.h_n[nlz, nly, nlx])
+                            h += h % 2 # Make h even -> makes resulting structures both safer and more aesthetically pleasing
+
+                            # create "box" repositioning the center into the node
+                            umin = int(np.maximum(nlx - 0.5 - h/2, 0))
+                            umax = int(np.minimum(nlx - 0.5 + h/2 + 1, self.nelx))
+                            vmin = int(np.maximum(nly - 0.5 - h/2, 0))
+                            vmax = int(np.minimum(nly - 0.5 + h/2 + 1, self.nely))
+                            wmin = int(np.maximum(nlz - 0.5 - h/2, 0))
+                            wmax = int(np.minimum(nlz - 0.5 + h/2 + 1, self.nelz))
+                            for i in range(umin, umax):
+                                for j in range(vmin, vmax):
+                                    for k in range(wmin, wmax):
+                                        if (i-nlx+0.5)**2 + (j-nly+0.5)**2 + (k-nlz+0.5)**2 <= (h/2)**2:
+                                            self.desvars[k, j, i] = SOLID
 
     def preprocessK(self):
         """
@@ -884,34 +894,30 @@ class TopologyGen:
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
-                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                    (ely + elx * (self.nely + 1))
                     if self.desvars[ely, elx] > 0:
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1))
                         updatedKe = self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
-
-            for i in range(K.shape[0]):
-                if K[i, i] == 0:
-                    self.remove_list[i] = False
 
         else: #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
                     for ely in range(self.nely):
-                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                    (ely + elx * (self.nely + 1) + elz *\
-                                    (self.nelx + 1) * (self.nely + 1))
-                        if self.probtype == 'comp' or self.probtype == 'mech':
-                            updatedKe = self.desvars[elz, ely, elx] ** \
-                            self.p * self.Ke
-                        elif self.probtype == 'heat':
-                            updatedKe = (VOID + (1 - VOID) * \
-                            self.desvars[elz, ely, elx] ** self.p) * self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        if self.desvars[elz, ely, elx] > 0:
+                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                        (ely + elx * (self.nely + 1) + elz *\
+                                        (self.nelx + 1) * (self.nely + 1))
+                            updatedKe = self.Ke
+                            mask = np.ones(e2sdofmap.size, dtype=int)
+                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
 
-        #  Del constrained rows and columns
+        for i in range(K.shape[0]):
+            if K[i, i] == 0:
+                self.remove_list[i] = False
+
+        #  Del unnecessary and constrained rows and columns
         K = K[self.remove_list][:,self.remove_list]
         return K
 

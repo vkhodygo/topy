@@ -7,21 +7,21 @@ TO_TYPE:     gen          # or trad, for traditional approach
 ELEM_E:      186          # GPa
 ELEM_NU:     0.29
 ELEM_TC:     51.9         # W/(m*K)
-ELEM_L:      5            # mm (half-length of element)
+ELEM_L:      50          # mm (half-length of element)
 
 PROB_TYPE:   comp
-PROB_NAME:   test_2
+PROB_NAME:   test_1
 DOF_PN:      3
 VOL_FRAC:    0.30
 ELEM_K:      H8
-NUM_ELEM_X:  10
-NUM_ELEM_Y:  10
+NUM_ELEM_X:  20
+NUM_ELEM_Y:  20
 NUM_ELEM_Z:  50
-FXTR_NODE_X: 1|121
-FXTR_NODE_Y: 1|121
-FXTR_NODE_Z: 1|121
-LOAD_NODE_Y: 6111
-LOAD_VALU_Y: 10000
+FXTR_NODE_X: 1|441
+FXTR_NODE_Y: 1|441
+FXTR_NODE_Z: 1|441
+LOAD_NODE_Y: 22271
+LOAD_VALU_Y: 7000
 
 # End conditions
 NUM_ITER   : 50
@@ -30,7 +30,16 @@ SHEAR_MAX  : 100         # MPa
 VOL_FRAC   : 0.30
 
 # Grey-scale filter (GSF)
-P_FAC      : 2
-Q_FAC      : 3
 ETA:         0.4
 FILT_RAD:    1.8
+P_FAC      : 1
+P_HOLD     : 15  # num of iters to hold p constant from start
+P_INCR     : 0.2  # increment by this amount
+P_CON      : 1  # increment every 'P_CON' iters
+P_MAX      : 3  # max value of 'P_CON'
+
+Q_FAC      : 1
+Q_HOLD     : 15  # num of iters to hold q constant from start
+Q_INCR     : 0.05  # increment by this amount
+Q_CON      : 1  # increment every 'Q_CON' iters
+Q_MAX      : 5  # max value of 'Q_CON'

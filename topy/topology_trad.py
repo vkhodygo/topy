@@ -14,6 +14,8 @@ import numpy as np
 #from pysparse import superlu, itsolvers, precon
 from scipy import sparse
 from scipy.sparse import linalg
+from mumps import DMumpsContext
+from mpi4py import MPI
 
 from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
@@ -275,47 +277,55 @@ class TopologyTrad:
         See also: set_top_params
 
         """
-        if not self.topydict:
-            raise Exception('You must first load a TPD file!')
-        if self.itercount >= MAX_ITERS:
-            raise Exception('Maximum internal number of iterations exceeded!')
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
 
-        Kfree = self._updateK(self.K.copy())
+        if rank == 0:
+            if not self.topydict:
+                raise Exception('You must first load a TPD file!')
+            if self.itercount >= MAX_ITERS:
+                raise Exception('Maximum internal number of iterations exceeded!')
 
-        if self.dofpn < 3 and self.nelz == 0: #  Direct solver
-            Kfree = sparse.csc_matrix(Kfree)
-            lu = linalg.splu(Kfree)
-            self.dfree = lu.solve(self.rfree)
+            Kfree = self._updateK(self.K.copy())
+
+        # MUMPS with PyMumps
+        ctx = DMumpsContext(par=1, sym=1, comm=None)
+        ctx.set_icntl(6, 7)
+        ctx.set_silent()
+        if ctx.myid == 0:
+            Kfree_tril= sparse.tril(Kfree.copy(), format='coo')
+            ctx.set_centralized_sparse(Kfree_tril)
+
+        ctx.run(job=4) # Analysis + Factorization
+
+        if ctx.myid == 0:
+            x = self.rfree[removed].copy()
+            ctx.set_rhs(x) # Modified in place
+
+        ctx.run(job=3) # Solve
+
+        if ctx.myid == 0:
+            self.dfree[removed] = x
+
             if self.probtype == 'mech':
-                self.dfreeout = lu.solve(self.rfreeout)
-        else: #  Iterative solver for 3D problems
-            Kfree = sparse.csc_matrix(Kfree, dtype=np.float32)
-            lu = linalg.splu(Kfree)
-            preK_x = lambda x: lu.solve(np.asarray(x, dtype=np.float32))
-            preK = linalg.LinearOperator(Kfree.shape, preK_x)
-            # ToPy's original implementation used Preconditioned Conjugate Gradient (PCG) from PySparse.
-            # SciPy's implementation (linalg.cg) didn't converge. This was the first function that
-            # managed to converge, but it is pretty slow.
-            self.dfree, info = linalg.minres(Kfree, self.rfree, tol=1e-8, maxiter=8000, M=preK)
-            if info > 0:
-                logger.error('Solver error: Number of iterations: {}.'.format(info))
-                raise Exception('Solution for FEA did not converge.')
-            else:
-                logger.debug('TgPy: Solution for FEA converged.')
-            if self.probtype == 'mech':  # mechanism synthesis
-                # This was also PCG.
-                self.dfreeout, info = linalg.minres(Kfree, self.rfreeout, tol=1e-8, maxiter=8000, M=preK)
-                if info > 0:
-                    logger.error('Solver error: Number of iterations: {}.'.format(info))
-                    raise Exception('Solution for FEA of adjoint load '
-                                    'case did not converge.')
+                if ctx.myid == 0:
+                    x = self.rfreeout[removed].copy()
+                    ctx.set_rhs(x) # Modified in place
 
-        # Update displacement vectors:
-        self.d[self.freedof] = self.dfree
-        if self.probtype == 'mech':  # 'adjoint' vectors
-            self.dout[self.freedof] = self.dfreeout
-        # Increment internal iteration counter
-        self.itercount += 1
+                ctx.run(job=3) # Solve
+
+                if ctx.myid == 0:
+                    self.dfreeout[removed] = x
+
+        ctx.destroy() # Cleanup
+
+        if rank == 0:
+            # Update displacement vectors:
+            self.d[self.freedof] = self.dfree
+            if self.probtype == 'mech':  # 'adjoint' vectors
+                self.dout[self.freedof] = self.dfreeout
+            # Increment internal iteration counter
+            self.itercount += 1
 
     def filter_sens_sigmund(self):
         """

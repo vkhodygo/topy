@@ -7,19 +7,29 @@
 from sys import argv
 import topy
 from topy import parser
+from mpi4py import MPI
+from mumps import DMumpsContext
 
 
 def optimise(fname):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
     # Set up ToPy:
-    d = parser.tpd_file2dict(fname)
-    if d['TO_TYPE'] == "trad":
-        t = topy.TopologyTrad(topydict=d)
-    elif d['TO_TYPE'] == "gen":
-        t = topy.TopologyGen(topydict=d)
-    else:
-        raise ValueError("Unknown topology optimization approach: {}".format(d['TO_TYPE']))
+    t = None
+    if rank == 0:
+        d = parser.tpd_file2dict(fname)
 
-    t.set_top_params()
+        if d['TO_TYPE'] == "trad":
+            t = topy.TopologyTrad(topydict=d)
+        elif d['TO_TYPE'] == "gen":
+            t = topy.TopologyGen(topydict=d)
+        else:
+            raise ValueError("Unknown topology optimization approach: {}".format(d['TO_TYPE']))
+
+        t.set_top_params()
+
+    t = comm.bcast(t, root=0)
+
     topy.optimise(t)
 
 
