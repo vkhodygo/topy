@@ -3,6 +3,8 @@
 # Author: William Hunter, Tarcísio L. de Oliveira
 # 'Classic' 40x20 2d domain, as per Ole Sigmund's 104 line code.
 # Matlab command: topm(40, 20, 0.3, 3.0, 1.2)
+# Provided for purpose of analysis. Doesn't converge under the
+# new approach.
 
 TO_TYPE:     gen          # or trad, for traditional approach
 
@@ -13,7 +15,7 @@ ELEM_L:      1            # mm (half-length of element)
 THICKNESS  : 1	          # mm
 
 PROB_TYPE  : mech
-PROB_NAME  : inverter_2d_eta03
+PROB_NAME  : test_4
 ETA        : 0.3
 DOF_PN     : 2
 VOL_FRAC   : 0.3

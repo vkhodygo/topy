@@ -63,12 +63,15 @@ class TopologyGen:
     # === Public methods ===
     # ======================
     def preprocess_space(self):
-        Kfree = self.createK()
-        self.fea(Kfree)
-        if self.probtype != "heat":
-            logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
-            self.expand()
-        self.desvars = self.volfrac*self.desvars
+        if self.probtype != "mech":
+            Kfree = self.createK()
+            self.fea(Kfree)
+            if self.probtype == "comp":
+                logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
+                self.expand()
+            self.desvars = self.volfrac*self.desvars
+        else:
+            self.desvars = self.desvars + self.volfrac
         Kfree = self.preprocessK()
 
         return Kfree
@@ -377,7 +380,7 @@ class TopologyGen:
 
         _L = self.topydict['ELEM_L']
         # Calculate h values for first run
-        if self.stress == 0.0:
+        if self.stress == 0.0 and self.probtype != "mech":
             if self.dofpn < 3 and self.nelz == 0:
                 x, y = symbols("x y")
                 num_elem = self.nelx * self.nely
@@ -397,7 +400,7 @@ class TopologyGen:
                             if self.probtype == 'comp':
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
                             elif self.probtype == 'mech':
-                                strain_vec = np.dot(B, self.d[e2sdofmap])
+                                strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
                             s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
                             self.h_n[_yn, _xn] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
@@ -436,7 +439,7 @@ class TopologyGen:
                     if self.probtype == 'comp':
                         strain_vec = np.dot(B, self.d[e2sdofmap])
                     elif self.probtype == 'mech':
-                        strain_vec = np.dot(B, self.d[e2sdofmap])
+                        strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
                     stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
                     
@@ -765,11 +768,11 @@ class TopologyGen:
         for l in loads:
             self.desvars = get_path(self.desvars, fixed, active, passive, l)
 
-        if self.probtype == 'mech':
-            loads_out = split_loads(self.loaddofout, self.nelx, self.nely, self.nelz, self.dofpn)
-            for lo in loads_out:
-                self.desvars = get_path(self.desvars, loads, active, passive, lo)
-                self.desvars = get_path(self.desvars, fixed, active, passive, lo)
+        # if self.probtype == 'mech':
+        #     loads_out = split_loads(self.loaddofout, self.nelx, self.nely, self.nelz, self.dofpn)
+        #     for lo in loads_out:
+        #         self.desvars = get_path(self.desvars, loads, active, passive, lo)
+        #         self.desvars = get_path(self.desvars, fixed, active, passive, lo)
 
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
