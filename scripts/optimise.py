@@ -14,8 +14,13 @@ from mumps import DMumpsContext
 def optimise(fname):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+
+    # MPI hack to prevent lambda serialization
+    t = topy.TopologyGen()
+    t.topydict['TO_TYPE'] = "gen"
+    t.chgstop = -1
+    t.numiter = 0
     # Set up ToPy:
-    t = None
     if rank == 0:
         d = parser.tpd_file2dict(fname)
 
@@ -27,8 +32,11 @@ def optimise(fname):
             raise ValueError("Unknown topology optimization approach: {}".format(d['TO_TYPE']))
 
         t.set_top_params()
+        t.chgstop = -1
 
-    t = comm.bcast(t, root=0)
+    t.topydict['TO_TYPE'] = comm.bcast(t.topydict['TO_TYPE'], root=0)
+    t.chgstop = comm.bcast(t.chgstop, root=0)
+    t.numiter = comm.bcast(t.numiter, root=0)
 
     topy.optimise(t)
 

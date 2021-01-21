@@ -20,7 +20,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=["topy", "topy.data"],
-    install_requires=['typing', 'pathlib', 'matplotlib', 'sympy', 'numpy<1.17', 'pyvtk', 'scipy<1.6', 'cython', 'pymumps'],
+    install_requires=['typing', 'pathlib', 'matplotlib', 'sympy', 'numpy', 'pyvtk', 'scipy', 'cython', 'pymumps', 'numexpr'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

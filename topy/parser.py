@@ -223,7 +223,7 @@ def _parsev2007file(s):
     Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
     (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint for PySparse
     #d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize) #  Global stiffness matrix
-    d['K'] = sparse.dok_matrix((Ksize, Ksize), dtype=np.float32)
+    d['K'] = sparse.dok_matrix((Ksize, Ksize), dtype=np.double)
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
     d['DOF_PN']) #  Initial element to structure DOF mapping
 

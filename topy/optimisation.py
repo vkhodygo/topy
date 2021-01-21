@@ -7,6 +7,9 @@ from mpi4py import MPI
 from .utils import get_logger
 from .visualisation import *
 
+import cProfile
+import pstats
+
 logger = get_logger(__name__)
 
 
@@ -24,7 +27,7 @@ def optimise(topology, save=True, dir='./iterations'):
 # Optimising function:
     def _optimise_trad(t):
         t.fea()
-
+    
         if rank == 0:
             t.sens_analysis()
             t.filter_sens_sigmund()
@@ -63,10 +66,18 @@ def optimise(topology, save=True, dir='./iterations'):
         t.fea(Kfree)
 
         if rank == 0:
+            #profile = cProfile.Profile()
+            #profile.enable()
+
             t.sens_analysis()
             t.filter_sens_sigmund()
             t.update_desvars_oc()
             Kfree = t.updateK()
+
+            #profile.disable()
+            #ps = pstats.Stats(profile)
+            #ps.sort_stats('cumtime')
+            #ps.print_stats()
 
             # Below this line we print info and create images or geometry:
             if t.nelz:
@@ -132,14 +143,14 @@ def optimise(topology, save=True, dir='./iterations'):
 
     # Optimize, and check for stop conditions
     if topology.topydict["TO_TYPE"] == "trad":
-        if hasattr(topology, "chgstop"):
+        if topology.chgstop > -1:
             while topology.change > topology.chgstop:
                 _optimise_trad(topology)
         else:
             for i in range(topology.numiter):
                 _optimise_trad(topology)
     else:
-        if hasattr(topology, "chgstop"):
+        if topology.chgstop > -1:
             while topology.change > topology.chgstop:
                 Kfree = _optimise_gen(topology, Kfree)
         else:

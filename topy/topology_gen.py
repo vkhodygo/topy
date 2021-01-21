@@ -11,6 +11,7 @@
 import os
 
 import numpy as np
+import numexpr as ne
 
 from scipy import sparse
 from scipy.sparse import linalg
@@ -177,6 +178,16 @@ class TopologyGen:
             self.numiter = MAX_ITERS
 
         self.stress = 0.0 # Current maximum stress
+        self.objfval = 0.0 # Objective function
+
+        if self.nelz == 0:
+            from sympy import lambdify
+            from sympy.abc import x, y
+            self.Bf = lambdify((x, y), self.Be.copy(), "numpy")
+        else:
+            from sympy import lambdify
+            from sympy.abc import x, y, z
+            self.Bf = lambdify((x, y, z), self.Be.copy(), "numpy")
 
         # All DOF vector and design variables arrays:
         # This needs to be recoded at some point, perhaps. I originally
@@ -297,7 +308,7 @@ class TopologyGen:
             else:
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof, maskin)
                 self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout, maskout)
-
+    
     def fea(self, Kfree):
         """
         Performs a Finite Element Analysis given the updated global stiffness
@@ -326,12 +337,14 @@ class TopologyGen:
             removed = self.remove_list[self._rcfixed].copy()
 
         # MUMPS with PyMumps
-        ctx = DMumpsContext(par=1, sym=1, comm=None)
+        # It is faster to assume the matrix as unsymmetric than to convert it
+        # to a triangular matrix before it.
+        ctx = DMumpsContext(par=1, sym=0, comm=None)
         ctx.set_icntl(6, 7)
         ctx.set_silent()
         if ctx.myid == 0:
-            Kfree_tril= sparse.tril(Kfree.copy(), format='coo')
-            ctx.set_centralized_sparse(Kfree_tril)
+            #Kfree_tril= sparse.tril(Kfree.copy(), format='coo')
+            ctx.set_centralized_sparse(Kfree.tocoo())
 
         ctx.run(job=4) # Analysis + Factorization
 
@@ -358,6 +371,7 @@ class TopologyGen:
 
 
         if rank == 0:
+
             # Update displacement vectors:
             self.d[self.freedof] = self.dfree
             if self.probtype == 'mech':  # 'adjoint' vectors
@@ -386,7 +400,8 @@ class TopologyGen:
                             for t in nodes:
                                 _xn = t[0]
                                 _yn = t[1]
-                                B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
+                                B = self.Bf(2*_L*_xn, 2*_L*_yn)
+                                #B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
 
                                 s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
@@ -410,7 +425,8 @@ class TopologyGen:
                                 _xn = t[0]
                                 _yn = t[1]
                                 _zn = t[2]
-                                B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn), z:(2*_L*_zn)})).astype('double')
+                                B = self.Bf(2*_L*_xn, 2*_L*_yn, 2*_L*_zn)
+                                #B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn), z:(2*_L*_zn)})).astype('double')
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
 
                                 s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
@@ -431,7 +447,8 @@ class TopologyGen:
                     if self.desvars[_y, _x] > 0:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (_y + _x * (self.nely + 1))
-                        B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
+                        B = self.Bf(2*_L*(_x+0.5), 2*_L*(_y+0.5))
+                        #B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
                         if self.probtype == 'comp':
                             strain_vec = np.dot(B, self.d[e2sdofmap])
                         elif self.probtype == 'mech':
@@ -453,7 +470,8 @@ class TopologyGen:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (_y + _x * (self.nely + 1) + _z *\
                                     (self.nelx + 1) * (self.nely + 1))
-                        B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
+                        B = self.Bf(2*_L*(_x+0.5), 2*_L*(_y+0.5), 2*_L*(_z+0.5))
+                        #B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
                         if self.probtype == 'comp':
                             strain_vec = np.dot(B, self.d[e2sdofmap])
                         elif self.probtype == 'mech':
@@ -487,11 +505,11 @@ class TopologyGen:
                     'dir': "iterations"
                 }
                 create_3d_geom(stress_img, **params)
-
+    
     def filter_sens_sigmund(self):
         """
         Filter the design sensitivities using Sigmund's heuristic approach.
-        Return the filtered sensitivities.
+            Return the filtered sensitivities.
 
         EXAMPLES:
             >>> t.filter_sens_sigmund()
@@ -566,7 +584,7 @@ class TopologyGen:
     
             Y, X = np.indices((self.nely, self.nelx))
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1,1), axis=1)
-            e2sdofmap = np.add(e2sdofmap, self.dofpn * (Y + X * (self.nely + 1)))
+            e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (Y + X * (nely + 1))", global_dict={"dofpn":self.dofpn, "nely":self.nely})
             Qe = self.d[e2sdofmap]
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe, 2, 1).T
@@ -578,7 +596,7 @@ class TopologyGen:
             X *= (self.nely + 1)
             Z *= (self.nelx + 1) * (self.nely + 1)
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1, 1, 1), axis=1)
-            e2sdofmap = np.add(e2sdofmap, self.dofpn * (X + Y + Z))
+            e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (X + Y + Z)", global_dict={"dofpn":self.dofpn})
             Qe = self.d[e2sdofmap]
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe.T, 2, 0)
@@ -586,18 +604,19 @@ class TopologyGen:
         
         # Update TMP
         if self.probtype == 'comp':
-            self.objfval += ((self.desvars ** self.p) * QeKQe).sum()
-            tmp = - self.p * self.desvars ** (self.p - 1) * QeKQe
+            self.objfval += ne.evaluate("sum((desvars ** p) * QeKQe)", global_dict={"desvars":self.desvars, "p":self.p})
+            tmp = ne.evaluate("- p * desvars ** (p - 1) * QeKQe", global_dict={"desvars":self.desvars, "p":self.p})
 
         elif self.probtype == 'heat':
-            obj = (VOID + (1 - VOID) * self.desvars ** self.p)
-            self.objfval += (obj * QeKQe).sum()
-            fac1 = - (1 - VOID) * self.p * self.desvars ** (self.p - 1)
-            tmp = fac1 * QeKQe
+            obj = ne.evaluate("VOID + (1 - VOID) * desvars ** p", global_dict={"desvars":self.desvars, "p":self.p})
+            self.objfval += ne.evaluate("sum(obj * QeKQe)")
+            fac1 = ne.evaluate("- (1 - VOID) * p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p})
+            tmp = ne.evaluate("fac1 * QeKQe")
 
         elif self.probtype == 'mech':
-            self.objfval = self.d[self.loaddofout].sum()
-            tmp = self.p * self.desvars ** (self.p - 1)
+            self.objfval = ne.evaluate("sum(d)", global_dict={"d":self.d[self.loaddofout]})
+            tmp = ne.evaluante("p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p})
+
             
             if self.nelz == 0:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap], 2, 1).T
@@ -606,10 +625,8 @@ class TopologyGen:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap].T, 2, 0)
                 op = np.einsum('klmn,klmn->klm', QeK, QeOut_T)
             tmp *= op
-            
-            
-        self.df = tmp
 
+        self.df = tmp
 
     def update_desvars_oc(self):
         """
@@ -775,8 +792,8 @@ class TopologyGen:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (ely + elx * (self.nely + 1))
                         updatedKe = self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
         else: #  3D problem
             for elz in range(self.nelz):
@@ -787,8 +804,8 @@ class TopologyGen:
                                         (ely + elx * (self.nely + 1) + elz *\
                                         (self.nelx + 1) * (self.nely + 1))
                             updatedKe = self.Ke
-                            mask = np.ones(e2sdofmap.size, dtype=int)
-                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                            #K[e2sdofmap][:,e2sdofmap] += updatedKe
+                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
         for i in range(K.shape[0]):
             if K[i, i] == 0:
@@ -818,8 +835,8 @@ class TopologyGen:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[ely, elx] ** self.p) * self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
         else: #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
@@ -833,12 +850,18 @@ class TopologyGen:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
 
-        #  Del constrained rows and columns
-        K = K[self.remove_list][:,self.remove_list]
+        # Del constrained rows and columns
+        # It is faster to convert and operate on the matrix than to slice the
+        # original dok_matrix.
+        K = K.tocsr()
+        K = K[self.remove_list]
+        K = K.tocsc()
+        K = K[:,self.remove_list]
+
         return K
 
     def expand(self):
@@ -898,10 +921,11 @@ class TopologyGen:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (ely + elx * (self.nely + 1))
                         updatedKe = self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
         else: #  3D problem
+            point = np.mgrid[0:self.nelz, 0:self.nely, 0:self.nelx].reshape(3,-1).T
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
                     for ely in range(self.nely):
@@ -910,24 +934,32 @@ class TopologyGen:
                                         (ely + elx * (self.nely + 1) + elz *\
                                         (self.nelx + 1) * (self.nely + 1))
                             updatedKe = self.Ke
-                            mask = np.ones(e2sdofmap.size, dtype=int)
-                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                            #K[e2sdofmap][:,e2sdofmap] += updatedKe
+                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
         for i in range(K.shape[0]):
             if K[i, i] == 0:
                 self.remove_list[i] = False
 
-        #  Del unnecessary and constrained rows and columns
-        K = K[self.remove_list][:,self.remove_list]
+        # Del unnecessary and constrained rows and columns
+        # It is faster to convert and operate on the matrix than to slice the
+        # original dok_matrix.
+        K = K.tocsr()
+        K = K[self.remove_list]
+        K = K.tocsc()
+        K = K[:,self.remove_list]
         return K
 
     # Taken from the PySparse documentation, in order to act as a substitute
     # for the method of the same name it provided for sparse matrices.
-    def _update_add_mask_sym(self, A, B, ind, mask):
+    # Fastest way I could find to do this, but currently it is the
+    # implementation's greatest bottleneck by far.
+    def _update_add_mask_sym(self, A, B, ind):
         for i in range(len(ind)):
             for j in range(len(ind)):
-                if mask[i]:
-                    A[ind[i],ind[j]] += B[i,j]
+                k = dict.get(A, (ind[i], ind[j]), 0)
+                A._update({(ind[i],ind[j]):k+B[i,j]})
+                #A[ind[i],ind[j]] += B[i,j]
 
         return A
 
