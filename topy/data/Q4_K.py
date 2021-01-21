@@ -26,18 +26,17 @@ def create_K(_L, _E, _nu, _k, _t):
     _g = _E /  ((1 + _nu) * (1 - 2 * _nu))
     
     # SymPy symbols:
-    a, b, x, y = symbols('a b x y')
-    E, nu = symbols('E nu')
+    x, y = symbols('x y')
     N1, N2, N3, N4 = symbols('N1 N2 N3 N4')
     xlist = [x, x, x, x, x, x, x, x]
     ylist = [y, y, y, y, y, y, y, y]
     yxlist = [y, x, y, x, y, x, y, x]
 
     # Shape functions:
-    N1 = (a - x) * (b - y) / (4 * a * b)
-    N2 = (a + x) * (b - y) / (4 * a * b)
-    N3 = (a + x) * (b + y) / (4 * a * b)
-    N4 = (a - x) * (b + y) / (4 * a * b)
+    N1 = (_a - x) * (_b - y) / (4 * _a * _b)
+    N2 = (_a + x) * (_b - y) / (4 * _a * _b)
+    N3 = (_a + x) * (_b + y) / (4 * _a * _b)
+    N4 = (_a - x) * (_b + y) / (4 * _a * _b)
 
     # Create strain-displacement matrix B:
     B0 = tuple(map(diff, [N1, 0, N2, 0, N3, 0, N4, 0], xlist))
@@ -46,20 +45,19 @@ def create_K(_L, _E, _nu, _k, _t):
     B = Matrix([B0, B1, B2])
 
     # Create constitutive (material property) matrix for plane stress:
-    C = (E / (1 - nu**2)) * Matrix([[1, nu, 0],
-                                    [nu, 1, 0],
-                                    [0,  0, (1 - nu) / 2]])
+    C = (_E / (1 - _nu**2)) * Matrix([[1, _nu, 0],
+                                      [_nu, 1, 0],
+                                      [0,  0, (1 - _nu) / 2]])
 
     dK = B.T * C * B
 
     # Integration:
     logger.info('SymPy is integrating: K for Q4...')
-    K = dK.integrate((x, -a, a),(y, -b, b))
+    K = dK.integrate((x, -_a, _a),(y, -_b, _b))
 
     # Convert SymPy Matrix to NumPy array:
-    K = _t * array(K.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
-    B = B.subs({a:_a, b:_b, E:_E, nu:_nu})
-    C = array(C.subs({a:_a, b:_b, E:_E, nu:_nu})).astype('double')
+    K = _t * array(K, dtype='double')
+    C = array(C, dtype='double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0

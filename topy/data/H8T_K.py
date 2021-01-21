@@ -26,23 +26,22 @@ def create_K(_L, _E, _nu, _k, _t):
     _g = _E /  ((1 + _nu) * (1 - 2 * _nu))
 
     # SymPy symbols:
-    a, b, c, x, y, z = symbols('a b c x y z')
+    x, y, z = symbols('x y z')
     N1, N2, N3, N4 = symbols('N1 N2 N3 N4')
     N5, N6, N7, N8 = symbols('N5 N6 N7 N8')
-    k = symbols('k')
     xlist = [x, x, x, x, x, x, x, x]
     ylist = [y, y, y, y, y, y, y, y]
     zlist = [z, z, z, z, z, z, z, z]
 
     # Shape functions:
-    N1 = (a - x) * (b - y) * (c - z) / (8 * a * b * c)
-    N2 = (a + x) * (b - y) * (c - z) / (8 * a * b * c)
-    N3 = (a + x) * (b + y) * (c - z) / (8 * a * b * c)
-    N4 = (a - x) * (b + y) * (c - z) / (8 * a * b * c)
-    N5 = (a - x) * (b - y) * (c + z) / (8 * a * b * c)
-    N6 = (a + x) * (b - y) * (c + z) / (8 * a * b * c)
-    N7 = (a + x) * (b + y) * (c + z) / (8 * a * b * c)
-    N8 = (a - x) * (b + y) * (c + z) / (8 * a * b * c)
+    N1 = (_a - x) * (_b - y) * (_c - z) / (8 * _a * _b * _c)
+    N2 = (_a + x) * (_b - y) * (_c - z) / (8 * _a * _b * _c)
+    N3 = (_a + x) * (_b + y) * (_c - z) / (8 * _a * _b * _c)
+    N4 = (_a - x) * (_b + y) * (_c - z) / (8 * _a * _b * _c)
+    N5 = (_a - x) * (_b - y) * (_c + z) / (8 * _a * _b * _c)
+    N6 = (_a + x) * (_b - y) * (_c + z) / (8 * _a * _b * _c)
+    N7 = (_a + x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
+    N8 = (_a - x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
 
     # Create strain-displacement matrix B:
     B0 = tuple(map(diff, [N1, N2, N3, N4, N5, N6, N7, N8], xlist))
@@ -51,20 +50,19 @@ def create_K(_L, _E, _nu, _k, _t):
     B = Matrix([B0, B1, B2])
 
     # Create conductivity matrix:
-    C = Matrix([[k, 0, 0],
-                [0, k, 0],
-                [0, 0, k]])
+    C = Matrix([[_k, 0, 0],
+                [0, _k, 0],
+                [0, 0, _k]])
 
     dK = B.T * C * B
 
     # Integration:
     logger.info('SymPy is integrating: K for H8T...')
-    K = dK.integrate((x, -a, a),(y, -b, b),(z, -c, c))
+    K = dK.integrate((x, -_a, _a),(y, -_b, _b),(z, -_c, _c))
 
     # Convert SymPy Matrix to NumPy array:
-    K = array(K.subs({a:_a, b:_b, c:_c, k:_k})).astype('double')
-    B = B.subs({a:_a, b:_b, c:_c, k:_k})
-    C = array(C.subs({a:_a, b:_b, c:_c, k:_k})).astype('double')
+    K = array(K, dtype='double')
+    C = array(C, dtype='double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0

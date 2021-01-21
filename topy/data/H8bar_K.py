@@ -26,10 +26,9 @@ def create_K(_L, _E, _nu, _k, _t):
     _g = _E /  ((1 + _nu) * (1 - 2 * _nu))
 
     # SymPy symbols:
-    a, b, c, x, y, z = symbols('a b c x y z')
+    x, y, z = symbols('x y z')
     N1, N2, N3, N4 = symbols('N1 N2 N3 N4')
     N5, N6, N7, N8 = symbols('N5 N6 N7 N8')
-    E, nu, g, G = symbols('E nu g G')
     o = symbols('o') #  dummy symbol
     xlist = [x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x]
     ylist = [y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y]
@@ -39,14 +38,14 @@ def create_K(_L, _E, _nu, _k, _t):
     zxlist = [z, o, x, z, o, x, z, o, x, z, o, x, z, o, x, z, o, x, z, o, x, z, o, x]
 
     # Shape functions:
-    N1 = (a - x) * (b - y) * (c - z) / (8 * a * b * c)
-    N2 = (a + x) * (b - y) * (c - z) / (8 * a * b * c)
-    N3 = (a + x) * (b + y) * (c - z) / (8 * a * b * c)
-    N4 = (a - x) * (b + y) * (c - z) / (8 * a * b * c)
-    N5 = (a - x) * (b - y) * (c + z) / (8 * a * b * c)
-    N6 = (a + x) * (b - y) * (c + z) / (8 * a * b * c)
-    N7 = (a + x) * (b + y) * (c + z) / (8 * a * b * c)
-    N8 = (a - x) * (b + y) * (c + z) / (8 * a * b * c)
+    N1 = (_a - x) * (_b - y) * (_c - z) / (8 * _a * _b * _c)
+    N2 = (_a + x) * (_b - y) * (_c - z) / (8 * _a * _b * _c)
+    N3 = (_a + x) * (_b + y) * (_c - z) / (8 * _a * _b * _c)
+    N4 = (_a - x) * (_b + y) * (_c - z) / (8 * _a * _b * _c)
+    N5 = (_a - x) * (_b - y) * (_c + z) / (8 * _a * _b * _c)
+    N6 = (_a + x) * (_b - y) * (_c + z) / (8 * _a * _b * _c)
+    N7 = (_a + x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
+    N8 = (_a - x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
 
     # Create strain-displacement matrix B:
     B0 = tuple(map(diff, [N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0, 0,\
@@ -64,12 +63,12 @@ def create_K(_L, _E, _nu, _k, _t):
     B = Matrix([B0, B1, B2, B3, B4, B5])
 
     # Create constitutive (material property) matrix:
-    C = Matrix([[(1 - nu) * g, nu * g, nu * g, 0, 0, 0],
-                [nu * g, (1 - nu) * g, nu * g, 0, 0, 0],
-                [nu * g, nu * g, (1 - nu) * g, 0, 0, 0],
-                [0, 0, 0,                      G, 0, 0],
-                [0, 0, 0,                      0, G, 0],
-                [0, 0, 0,                      0, 0, G]])
+    C = Matrix([[(1 - _nu) * _g, _nu * _g, _nu * _g, 0, 0, 0],
+                [_nu * _g, (1 - _nu) * _g, _nu * _g, 0, 0, 0],
+                [_nu * _g, _nu * _g, (1 - _nu) * _g, 0, 0, 0],
+                [0, 0, 0,                           _G, 0, 0],
+                [0, 0, 0,                           0, _G, 0],
+                [0, 0, 0,                           0, 0, _G]])
 
     CB = C * B
 
@@ -95,12 +94,11 @@ def create_K(_L, _E, _nu, _k, _t):
 
     # Integration:
     logger.info('SymPy is integrating: K for H8bar...')
-    Kbar = dKbar.integrate((x, -a, a),(y, -b, b),(z, -c, c))
+    Kbar = dKbar.integrate((x, -_a, _a),(y, -_b, _b),(z, -_c, _c))
 
     # Convert SymPy Matrix to NumPy array:
-    K = array(Kbar.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})).astype('double')
-    B = B.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})
-    C = array(C.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})).astype('double')
+    K = array(Kbar, dtype='double')
+    C = array(C, dtype='double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0

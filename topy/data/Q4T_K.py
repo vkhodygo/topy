@@ -26,18 +26,16 @@ def create_K(_L, _E, _nu, _k, _t):
     _g = _E /  ((1 + _nu) * (1 - 2 * _nu))
     
     # SymPy symbols:
-    a, b, x, y = symbols('a b x y')
-    E, nu = symbols('E nu')
+    x, y = symbols('x y')
     N1, N2, N3, N4 = symbols('N1 N2 N3 N4')
-    k = symbols('k')
     xlist = [x, x, x, x]
     ylist = [y, y, y, y]
 
     # Shape functions:
-    N1 = (a - x) * (b - y) / (4 * a * b)
-    N2 = (a + x) * (b - y) / (4 * a * b)
-    N3 = (a + x) * (b + y) / (4 * a * b)
-    N4 = (a - x) * (b + y) / (4 * a * b)
+    N1 = (_a - x) * (_b - y) / (4 * _a * _b)
+    N2 = (_a + x) * (_b - y) / (4 * _a * _b)
+    N3 = (_a + x) * (_b + y) / (4 * _a * _b)
+    N4 = (_a - x) * (_b + y) / (4 * _a * _b)
 
     # Create strain-displacement matrix B:
     B0 = tuple(map(diff, [N1, N2, N3, N4], xlist))
@@ -45,19 +43,18 @@ def create_K(_L, _E, _nu, _k, _t):
     B = Matrix([B0, B1])
 
     # Create conductivity matrix:
-    C = Matrix([[k, 0],
-                [0, k]])
+    C = Matrix([[_k, 0],
+                [0, _k]])
 
     dK = B.T * C * B
 
     # Integration:
     logger.info('SymPy is integrating: K for Q4T...')
-    K = dK.integrate((x, -a, a),(y, -b, b))
+    K = dK.integrate((x, -_a, _a),(y, -_b, _b))
 
     # Convert SymPy Matrix to NumPy array:
-    K = _t * array(K.subs({a:_a, b:_b, k:_k})).astype('double')
-    B = B.subs({a:_a, b:_b, k:_k})
-    C = array(C.subs({a:_a, b:_b, k:_k})).astype('double')
+    K = _t * array(K, dtype='double')
+    C = array(C, dtype='double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0
