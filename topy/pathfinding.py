@@ -265,6 +265,9 @@ def get_path(mesh, supports, active, passive, load):
     return mesh
 
 def _nodes_connected(a1, n2, nelx, nely, nelz, dof):
+    """
+    Checks if a node n2 is connected to a group of nodes a1.
+    """
     for n1 in a1:
         if _neighbors_node(n1, n2, nelx, nely, nelz, dof):
             return True

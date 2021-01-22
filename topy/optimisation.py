@@ -66,18 +66,10 @@ def optimise(topology, save=True, dir='./iterations'):
         t.fea(Kfree)
 
         if rank == 0:
-            #profile = cProfile.Profile()
-            #profile.enable()
-
             t.sens_analysis()
             t.filter_sens_sigmund()
             t.update_desvars_oc()
             Kfree = t.updateK()
-
-            #profile.disable()
-            #ps = pstats.Stats(profile)
-            #ps.sort_stats('cumtime')
-            #ps.print_stats()
 
             # Below this line we print info and create images or geometry:
             if t.nelz:

@@ -312,13 +312,13 @@ class TopologyGen:
     def fea(self, Kfree):
         """
         Performs a Finite Element Analysis given the updated global stiffness
-        matrix [K] and the load vector {r}, both of which must be in the
-        modified state, i.e., [K] and {r} must represent the unconstrained
+        matrix [Kfree] and the load vector {r}, both of which must be in the
+        modified state, i.e., [Kfree] and {r} must represent the unconstrained
         system of equations. Return the global displacement vector {d} as a
         NumPy array.
 
         EXAMPLES:
-            >>> t.fea()
+            >>> t.fea(Kfree)
 
         See also: set_top_params
 
@@ -337,13 +337,10 @@ class TopologyGen:
             removed = self.remove_list[self._rcfixed].copy()
 
         # MUMPS with PyMumps
-        # It is faster to assume the matrix as unsymmetric than to convert it
-        # to a triangular matrix before it.
         ctx = DMumpsContext(par=1, sym=0, comm=None)
         ctx.set_icntl(6, 7)
         ctx.set_silent()
         if ctx.myid == 0:
-            #Kfree_tril= sparse.tril(Kfree.copy(), format='coo')
             ctx.set_centralized_sparse(Kfree.tocoo())
 
         ctx.run(job=4) # Analysis + Factorization
@@ -448,7 +445,6 @@ class TopologyGen:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (_y + _x * (self.nely + 1))
                         B = self.Bf(2*_L*(_x+0.5), 2*_L*(_y+0.5))
-                        #B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5))})).astype('double')
                         if self.probtype == 'comp':
                             strain_vec = np.dot(B, self.d[e2sdofmap])
                         elif self.probtype == 'mech':
@@ -471,7 +467,6 @@ class TopologyGen:
                                     (_y + _x * (self.nely + 1) + _z *\
                                     (self.nelx + 1) * (self.nely + 1))
                         B = self.Bf(2*_L*(_x+0.5), 2*_L*(_y+0.5), 2*_L*(_z+0.5))
-                        #B = np.array(self.Be.copy().subs({x:(2*_L*(_x+0.5)), y:(2*_L*(_y+0.5)), z:(2*_L*(_z+0.5)) })).astype('double')
                         if self.probtype == 'comp':
                             strain_vec = np.dot(B, self.d[e2sdofmap])
                         elif self.probtype == 'mech':
@@ -779,12 +774,6 @@ class TopologyGen:
         for l in loads:
             self.desvars = get_path(self.desvars, fixed, active, passive, l)
 
-        # if self.probtype == 'mech':
-        #     loads_out = split_loads(self.loaddofout, self.nelx, self.nely, self.nelz, self.dofpn)
-        #     for lo in loads_out:
-        #         self.desvars = get_path(self.desvars, loads, active, passive, lo)
-        #         self.desvars = get_path(self.desvars, fixed, active, passive, lo)
-
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
@@ -835,7 +824,6 @@ class TopologyGen:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[ely, elx] ** self.p) * self.Ke
-                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
         else: #  3D problem
             for elz in range(self.nelz):
@@ -850,7 +838,6 @@ class TopologyGen:
                         elif self.probtype == 'heat':
                             updatedKe = (VOID + (1 - VOID) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
-                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
 
