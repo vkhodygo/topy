@@ -15,12 +15,21 @@ import os
 from sympy import symbols, Matrix, diff, integrate, zeros, lambdify
 from numpy import array, sqrt, abs
 from scipy.integrate import tplquad
-import multiprocessing
-from multiprocessing.pool import ThreadPool
+import multiprocessing as mp
+from functools import partial
 
 from ..utils import get_logger
 
 logger = get_logger(__name__)
+
+def dK_create(k):
+    from sympy.abc import x, y, z
+    return lambdify((x, y, z), k, "numpy")
+
+def dK_integ(_a, _b, _c, k):
+    from sympy.abc import x, y, z
+    l = lambdify((x, y, z), k, "numpy")
+    return tplquad(l, -_a, _a, lambda x: -_b, lambda x: _b, lambda x, y: -_c, lambda x, y: _c)[0]
 
 def create_K(_L, _E, _nu, _k, _t):
     # Initialize variables
@@ -76,12 +85,8 @@ def create_K(_L, _E, _nu, _k, _t):
     dK = B.T * C * B
 
     logger.info('SymPy is integrating: K for H8...')
-    p = ThreadPool(int(multiprocessing.cpu_count()))
-    dK_create = lambda k: lambdify((x, y, z), k, "numpy")
-    dK = p.map(dK_create, dK)
-
-    # Integration:
-    dK_integrate = lambda k: tplquad(k, -_a, _a, lambda x: -_b, lambda x: _b, lambda x, y: -_c, lambda x, y: _c)[0]
+    p = mp.Pool(int(mp.cpu_count()))
+    dK_integrate = partial(dK_integ, _a, _b, _c)
     K = array(p.map(dK_integrate, dK)).reshape(int(sqrt(len(dK))), -1)
     K = K.astype('double')
 
