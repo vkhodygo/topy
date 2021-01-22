@@ -67,7 +67,6 @@ class TopologyGen:
     def preprocess_space(self):
         if self.probtype != "mech":
             Kfree = self.createK()
-            Kfree = self.preprocessK()
             self.fea(Kfree)
             if self.probtype == "comp":
                 logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
@@ -337,7 +336,7 @@ class TopologyGen:
             removed = self.remove_list[self._rcfixed].copy()
 
         # MUMPS with PyMumps
-        ctx = DMumpsContext(par=1, sym=0, comm=None)
+        ctx = DMumpsContext(par=1, sym=1, comm=None)
         ctx.set_icntl(6, 7)
         ctx.set_silent()
         if ctx.myid == 0:
@@ -763,9 +762,6 @@ class TopologyGen:
         conditions.
 
         """
-        K = self.K.copy()
-        self.remove_list = self._rcfixed.copy()
-        
         loads = split_loads(self.loaddof, self.nelx, self.nely, self.nelz, self.dofpn)
         fixed = split(self.fixdof, self.nelx, self.nely, self.nelz, self.dofpn)
         active = active_points(self.actv, self.nelx, self.nely, self.nelz)
@@ -774,35 +770,7 @@ class TopologyGen:
         for l in loads:
             self.desvars = get_path(self.desvars, fixed, active, passive, l)
 
-        if self.nelz == 0: #  2D problem
-            for elx in range(self.nelx):
-                for ely in range(self.nely):
-                    if self.desvars[ely, elx] == 1:
-                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                    (ely + elx * (self.nely + 1))
-                        updatedKe = self.Ke
-                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
-                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
-
-        else: #  3D problem
-            for elz in range(self.nelz):
-                for elx in range(self.nelx):
-                    for ely in range(self.nely):
-                        if self.desvars[elz, ely, elx] == 1:
-                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                        (ely + elx * (self.nely + 1) + elz *\
-                                        (self.nelx + 1) * (self.nely + 1))
-                            updatedKe = self.Ke
-                            #K[e2sdofmap][:,e2sdofmap] += updatedKe
-                            K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
-
-        for i in range(K.shape[0]):
-            if K[i, i] == 0:
-                self.remove_list[i] = False
-
-        #  Del constrained rows and columns
-        K = K[self.remove_list][:,self.remove_list]
-        return K
+        return self.preprocessK()
 
     def updateK(self):
         """
@@ -908,11 +876,9 @@ class TopologyGen:
                         e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                     (ely + elx * (self.nely + 1))
                         updatedKe = self.Ke
-                        #K[e2sdofmap][:,e2sdofmap] += updatedKe
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
         else: #  3D problem
-            point = np.mgrid[0:self.nelz, 0:self.nely, 0:self.nelx].reshape(3,-1).T
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
                     for ely in range(self.nely):
@@ -921,7 +887,6 @@ class TopologyGen:
                                         (ely + elx * (self.nely + 1) + elz *\
                                         (self.nelx + 1) * (self.nely + 1))
                             updatedKe = self.Ke
-                            #K[e2sdofmap][:,e2sdofmap] += updatedKe
                             K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
         for i in range(K.shape[0]):
@@ -937,16 +902,17 @@ class TopologyGen:
         K = K[:,self.remove_list]
         return K
 
-    # Taken from the PySparse documentation, in order to act as a substitute
+    # Adapted from the PySparse documentation, in order to act as a substitute
     # for the method of the same name it provided for sparse matrices.
     # Fastest way I could find to do this, but currently it is the
     # implementation's greatest bottleneck by far.
+    # Fills just the upper triangle of the matrix, because it is symmetric and
+    # it fits with MUMPS's way of handling sym-pos-def matrices.
     def _update_add_mask_sym(self, A, B, ind):
         for i in range(len(ind)):
-            for j in range(len(ind)):
+            for j in range(i, len(ind)):
                 k = dict.get(A, (ind[i], ind[j]), 0)
                 A._update({(ind[i],ind[j]):k+B[i,j]})
-                #A[ind[i],ind[j]] += B[i,j]
 
         return A
 
