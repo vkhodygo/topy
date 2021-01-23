@@ -68,8 +68,10 @@ class TopologyGen:
         if self.probtype != "mech":
             Kfree = self.createK()
             self.fea(Kfree)
+            with np.printoptions(edgeitems=100):
+                print(self.stress_mat[:,9,9])
             if self.probtype == "comp":
-                logger.info("\nBase stress: %3.1f\n" % (self.stress*1e-6))
+                logger.info("\nBase stress: %3.1f MPa\n" % (self.stress*1e-6))
                 self.expand()
             self.desvars = self.volfrac*self.desvars
         else:
@@ -397,7 +399,6 @@ class TopologyGen:
                                 _xn = t[0]
                                 _yn = t[1]
                                 B = self.Bf(2*_L*_xn, 2*_L*_yn)
-                                #B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn)})).astype('double')
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
 
                                 s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
@@ -422,13 +423,13 @@ class TopologyGen:
                                 _yn = t[1]
                                 _zn = t[2]
                                 B = self.Bf(2*_L*_xn, 2*_L*_yn, 2*_L*_zn)
-                                #B = np.array(self.Be.copy().subs({x:(2*_L*_xn), y:(2*_L*_yn), z:(2*_L*_zn)})).astype('double')
                                 strain_vec = np.dot(B, self.d[e2sdofmap])
 
                                 s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
+                                print(s)
                                 hs = np.sqrt(4*np.amax(s[:3])/(np.pi*self.Smax))
                                 ht = np.sqrt(32*np.amax(s[3:])/(9*np.pi*self.Tmax))
-                                self.h_n[_z, _yn, _xn] = max(hs, ht)
+                                self.h_n[_zn, _yn, _xn] = max(hs, ht)
 
 
             # Calculate strain and stress values:
@@ -449,7 +450,7 @@ class TopologyGen:
                         elif self.probtype == 'mech':
                             strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
-                        stress_vec = self.desvars[_y, _x] * np.dot(self.Ce, strain_vec)
+                        stress_vec = (self.desvars[_y, _x] ** self.p) * np.dot(self.Ce, strain_vec)
                         
                         self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
 
@@ -471,7 +472,7 @@ class TopologyGen:
                         elif self.probtype == 'mech':
                             strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
-                        stress_vec = self.desvars[_z, _y, _x] * np.dot(self.Ce, strain_vec)
+                        stress_vec = (self.desvars[_z, _y, _x] ** self.p) * np.dot(self.Ce, strain_vec)
                         self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
 
             # Maximum stress reached
