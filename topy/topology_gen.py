@@ -68,8 +68,6 @@ class TopologyGen:
         if self.probtype != "mech":
             Kfree = self.createK()
             self.fea(Kfree)
-            with np.printoptions(edgeitems=100):
-                print(self.stress_mat[:,9,9])
             if self.probtype == "comp":
                 logger.info("\nBase stress: %3.1f MPa\n" % (self.stress*1e-6))
                 self.expand()
@@ -333,8 +331,6 @@ class TopologyGen:
             if self.itercount >= MAX_ITERS:
                 raise Exception('Maximum internal number of iterations exceeded!')
 
-            # Kfree = self._updateK(self.K.copy())
-
             removed = self.remove_list[self._rcfixed].copy()
 
         # MUMPS with PyMumps
@@ -384,96 +380,83 @@ class TopologyGen:
             # Calculate h values for first run
             if self.stress == 0.0 and self.probtype != "mech":
                 if self.dofpn < 3 and self.nelz == 0:
+                    B = [self.Bf(-_L, -_L), self.Bf(_L, -_L), self.Bf(-_L, _L), self.Bf(_L, _L)]
                     x, y = symbols("x y")
-                    num_elem = self.nelx * self.nely
-                    _x = 0
-                    _y = 0
-                    for i in range(num_elem):
-                        _x = int(np.floor(i / self.nely))
-                        _y = i % self.nely
-                        if self.desvars[_y, _x] > 0:
-                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                        (_y + _x * (self.nely + 1))
-                            nodes = [(_x, _y), (_x+1,_y), (_x,_y+1), (_x+1,_y+1)]
-                            for t in nodes:
-                                _xn = t[0]
-                                _yn = t[1]
-                                B = self.Bf(2*_L*_xn, 2*_L*_yn)
-                                strain_vec = np.dot(B, self.d[e2sdofmap])
+                    for _y in range(self.nely):
+                        for _x in range(self.nelx):
+                            if self.desvars[_y, _x] > 0:
+                                e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                            (_y + _x * (self.nely + 1))
+                                nodes = [(_y, _x), (_y+1,_x), (_y,_x+1), (_y+1,_x+1)]
+                                for i in range(4):
+                                    strain_vec = np.dot(B[i], self.d[e2sdofmap])
 
-                                s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
-                                self.h_n[_yn, _xn] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
+                                    s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
+                                    self.h_n[nodes[i]] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
 
                 else:
+                    B = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
+                         self.Bf( _L, -_L, -_L), self.Bf( _L, _L, -_L), self.Bf( _L, -_L, _L), self.Bf( _L, _L, _L)]
                     x, y, z = symbols("x y z")
-                    num_elem = self.nelx * self.nely * self.nelz
-                    for i in range(num_elem):
-                        _z = int(np.floor(i / (self.nely * self.nelx)))
-                        rest = i % (self.nely * self.nelx)
-                        _x = int(np.floor(rest / self.nely))
-                        _y = rest % self.nely
-                        if self.desvars[_z, _y, _x] > 0:
-                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                        (_y + _x * (self.nely + 1) + _z *\
-                                        (self.nelx + 1) * (self.nely + 1))
-                            nodes = [(_x,_y,_z), (_x+1,_y,_z), (_x,_y+1,_z), (_x+1,_y+1,_z),
-                                     (_x,_y,_z+1), (_x+1,_y,_z+1), (_x,_y+1,_z+1), (_x+1,_y+1,_z+1)]
-                            for t in nodes:
-                                _xn = t[0]
-                                _yn = t[1]
-                                _zn = t[2]
-                                B = self.Bf(2*_L*_xn, 2*_L*_yn, 2*_L*_zn)
-                                strain_vec = np.dot(B, self.d[e2sdofmap])
+                    for _z in range(self.nelz):
+                        for _y in range(self.nely):
+                            for _x in range(self.nelx):
+                                if self.desvars[_z, _y, _x] > 0:
+                                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                                (_y + _x * (self.nely + 1) + _z *\
+                                                (self.nelx + 1) * (self.nely + 1))
+                                    nodes = [(_z, _y, _x), (_z, _y+1,_x), (_z, _y,_x+1), (_z, _y+1,_x+1),
+                                             (_z+1, _y, _x), (_z+1, _y+1,_x), (_z+1, _y,_x+1), (_z+1, _y+1,_x+1)]
+                                    for i in range(8):
+                                        strain_vec = np.dot(B[i], self.d[e2sdofmap])
 
-                                s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
-                                print(s)
-                                hs = np.sqrt(4*np.amax(s[:3])/(np.pi*self.Smax))
-                                ht = np.sqrt(32*np.amax(s[3:])/(9*np.pi*self.Tmax))
-                                self.h_n[_zn, _yn, _xn] = max(hs, ht)
+                                        s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
+                                        hs = np.sqrt(4*np.amax(s[:3])/(np.pi*self.Smax))
+                                        ht = np.sqrt(32*np.amax(s[3:])/(9*np.pi*self.Tmax))
+                                        self.h_n[nodes[i]] = max(hs, ht)
 
 
             # Calculate strain and stress values:
             if self.dofpn < 3 and self.nelz == 0:
+                Bl = [self.Bf(-_L, -_L), self.Bf(_L, -_L), self.Bf(-_L, _L), self.Bf(_L, _L)]
                 x, y = symbols("x y")
-                num_elem = self.nelx * self.nely
-                _x = 0
-                _y = 0
-                for i in range(num_elem):
-                    _x = int(np.floor(i / self.nely))
-                    _y = i % self.nely
-                    if self.desvars[_y, _x] > 0:
-                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                    (_y + _x * (self.nely + 1))
-                        B = self.Bf(2*_L*(_x+0.5), 2*_L*(_y+0.5))
-                        if self.probtype == 'comp':
-                            strain_vec = np.dot(B, self.d[e2sdofmap])
-                        elif self.probtype == 'mech':
-                            strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
+                for _y in range(self.nely):
+                    for _x in range(self.nelx):
+                        if self.desvars[_y, _x] > 0:
+                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                        (_y + _x * (self.nely + 1))
+                            stressveclist = []
+                            for B in Bl:
+                                if self.probtype == 'comp':
+                                    strain_vec = np.dot(B, self.d[e2sdofmap])
+                                elif self.probtype == 'mech':
+                                    strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
-                        stress_vec = (self.desvars[_y, _x] ** self.p) * np.dot(self.Ce, strain_vec)
-                        
-                        self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
+                                stressveclist.append(np.abs((self.desvars[_y, _x] ** self.p) * np.dot(self.Ce, strain_vec)))
+                            stress_vec = np.amax(stressveclist, axis=0)
+                            self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
 
             else:
+                Bl = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
+                      self.Bf( _L, -_L, -_L), self.Bf( _L, _L, -_L), self.Bf( _L, -_L, _L), self.Bf( _L, _L, _L)]
                 x, y, z = symbols("x y z")
-                num_elem = self.nelx * self.nely * self.nelz
-                for i in range(num_elem):
-                    _z = int(np.floor(i / (self.nely * self.nelx)))
-                    rest = i % (self.nely * self.nelx)
-                    _x = int(np.floor(rest / self.nely))
-                    _y = rest % self.nely
-                    if self.desvars[_z, _y, _x] > 0:
-                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                    (_y + _x * (self.nely + 1) + _z *\
-                                    (self.nelx + 1) * (self.nely + 1))
-                        B = self.Bf(2*_L*(_x+0.5), 2*_L*(_y+0.5), 2*_L*(_z+0.5))
-                        if self.probtype == 'comp':
-                            strain_vec = np.dot(B, self.d[e2sdofmap])
-                        elif self.probtype == 'mech':
-                            strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
+                for _z in range(self.nelz):
+                    for _y in range(self.nely):
+                        for _x in range(self.nelx):
+                            if self.desvars[_z, _y, _x] > 0:
+                                e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                            (_y + _x * (self.nely + 1) + _z *\
+                                            (self.nelx + 1) * (self.nely + 1))
+                                stressveclist = []
+                                for B in Bl: 
+                                    if self.probtype == 'comp':
+                                        strain_vec = np.dot(B, self.d[e2sdofmap])
+                                    elif self.probtype == 'mech':
+                                        strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
-                        stress_vec = (self.desvars[_z, _y, _x] ** self.p) * np.dot(self.Ce, strain_vec)
-                        self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
+                                    stressveclist.append(np.abs((self.desvars[_z, _y, _x] ** self.p) * np.dot(self.Ce, strain_vec)))
+                                stress_vec = np.amax(stressveclist, axis=0)
+                                self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
 
             # Maximum stress reached
             self.stress = np.max(self.stress_mat)
