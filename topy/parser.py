@@ -119,9 +119,9 @@ def _parsev2007file(s):
         d['DOF_PN'] = int(d['DOF_PN'])
         d['ETA'] = str(d['ETA']).lower()
         d['ELEM_TYPE'] = d['ELEM_K']
-        d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
         raise ValueError('One or more parameters incorrectly specified.')
+
 
     # Material properties (for backwards compatibility)
     d['ELEM_E'] = 1.0
@@ -129,6 +129,16 @@ def _parsev2007file(s):
     d['ELEM_TC'] = 1.0
     d['ELEM_L'] = 0.5
     d['THICKNESS'] = 1.0
+
+    try:
+        K, B, C = create_element[d['ELEM_TYPE']](
+                    d['ELEM_L'], d['ELEM_E'], d['ELEM_NU'], d['ELEM_TC'], d['THICKNESS']
+                )
+        d['ELEM_K'] = K
+        d['ELEM_B'] = B
+        d['ELEM_C'] = C
+    except:
+        raise ValueError("Element name incorrectly specified.")
 
     # Type of approach for topology optimization (backwards compatibility)
     d['TO_TYPE'] = "trad"

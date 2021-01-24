@@ -15,7 +15,6 @@ import numexpr as ne
 
 from scipy import sparse
 from scipy.sparse import linalg
-from sympy import symbols
 from mumps import DMumpsContext
 from mpi4py import MPI
 
@@ -179,6 +178,7 @@ class TopologyGen:
         self.stress = 0.0 # Current maximum stress
         self.objfval = 0.0 # Objective function
 
+        # For stress calculations
         if self.nelz == 0:
             from sympy import lambdify
             from sympy.abc import x, y
@@ -299,14 +299,12 @@ class TopologyGen:
             self.dfreeout = np.zeros_like(self.rfreeout)
             ksin = np.ones(self.loaddof.shape, dtype='int') * KDATUM
             ksout = np.ones(self.loaddofout.shape, dtype='int') * KDATUM
-            maskin = np.ones(self.loaddof.shape, dtype='int')
-            maskout = np.ones(self.loaddofout.shape, dtype='int')
             if len(ksin) > 1:
-                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin, ksin]), self.loaddof, maskin)
-                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout, ksout]), self.loaddofout, maskout)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin, ksin]), self.loaddof)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout, ksout]), self.loaddofout)
             else:
-                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof, maskin)
-                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout, maskout)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout)
     
     def fea(self, Kfree):
         """
@@ -351,15 +349,15 @@ class TopologyGen:
         if ctx.myid == 0:
             self.dfree[removed] = x
 
-            if self.probtype == 'mech':
-                if ctx.myid == 0:
-                    x = self.rfreeout[removed].copy()
-                    ctx.set_rhs(x) # Modified in place
+        if self.probtype == 'mech':
+            if ctx.myid == 0:
+                x = self.rfreeout[removed].copy()
+                ctx.set_rhs(x) # Modified in place
 
-                ctx.run(job=3) # Solve
+            ctx.run(job=3) # Solve
 
-                if ctx.myid == 0:
-                    self.dfreeout[removed] = x
+            if ctx.myid == 0:
+                self.dfreeout[removed] = x
 
         ctx.destroy() # Cleanup
 
@@ -381,7 +379,6 @@ class TopologyGen:
             if self.stress == 0.0 and self.probtype != "mech":
                 if self.dofpn < 3 and self.nelz == 0:
                     B = [self.Bf(-_L, -_L), self.Bf(_L, -_L), self.Bf(-_L, _L), self.Bf(_L, _L)]
-                    x, y = symbols("x y")
                     for _y in range(self.nely):
                         for _x in range(self.nelx):
                             if self.desvars[_y, _x] > 0:
@@ -397,7 +394,6 @@ class TopologyGen:
                 else:
                     B = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
                          self.Bf( _L, -_L, -_L), self.Bf( _L, _L, -_L), self.Bf( _L, -_L, _L), self.Bf( _L, _L, _L)]
-                    x, y, z = symbols("x y z")
                     for _z in range(self.nelz):
                         for _y in range(self.nely):
                             for _x in range(self.nelx):
@@ -419,7 +415,6 @@ class TopologyGen:
             # Calculate strain and stress values:
             if self.dofpn < 3 and self.nelz == 0:
                 Bl = [self.Bf(-_L, -_L), self.Bf(_L, -_L), self.Bf(-_L, _L), self.Bf(_L, _L)]
-                x, y = symbols("x y")
                 for _y in range(self.nely):
                     for _x in range(self.nelx):
                         if self.desvars[_y, _x] > 0:
@@ -439,7 +434,6 @@ class TopologyGen:
             else:
                 Bl = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
                       self.Bf( _L, -_L, -_L), self.Bf( _L, _L, -_L), self.Bf( _L, -_L, _L), self.Bf( _L, _L, _L)]
-                x, y, z = symbols("x y z")
                 for _z in range(self.nelz):
                     for _y in range(self.nely):
                         for _x in range(self.nelx):
@@ -586,14 +580,14 @@ class TopologyGen:
             tmp = ne.evaluate("- p * desvars ** (p - 1) * QeKQe", global_dict={"desvars":self.desvars, "p":self.p})
 
         elif self.probtype == 'heat':
-            obj = ne.evaluate("VOID + (1 - VOID) * desvars ** p", global_dict={"desvars":self.desvars, "p":self.p})
+            obj = ne.evaluate("VOID + (1 - VOID) * desvars ** p", global_dict={"desvars":self.desvars, "p":self.p, "VOID":VOID})
             self.objfval += ne.evaluate("sum(obj * QeKQe)")
-            fac1 = ne.evaluate("- (1 - VOID) * p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p})
+            fac1 = ne.evaluate("- (1 - VOID) * p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p, "VOID":VOID})
             tmp = ne.evaluate("fac1 * QeKQe")
 
         elif self.probtype == 'mech':
             self.objfval = ne.evaluate("sum(d)", global_dict={"d":self.d[self.loaddofout]})
-            tmp = ne.evaluante("p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p})
+            tmp = ne.evaluate("p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p})
 
             
             if self.nelz == 0:
