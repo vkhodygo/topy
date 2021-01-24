@@ -1,0 +1,35 @@
+[ToPy Problem Definition File v2020]
+
+# Author: Tarcisio L. de Oliveira
+
+TO_TYPE:     trad         # or gen, for the experimental approac
+
+ELEM_E:      186          # GPa
+ELEM_NU:     0.29
+ELEM_TC:     51.9         # W/(m*K)
+ELEM_L:      25           # mm (half-length of element)
+THICKNESS:   50	          # mm
+
+PROB_TYPE:   comp
+PROB_NAME:   test_2
+DOF_PN:      2
+ELEM_K:      Q4
+NUM_ELEM_X:  120
+NUM_ELEM_Y:  80
+NUM_ELEM_Z:  0
+FXTR_NODE_X: 41
+FXTR_NODE_Y: 41;9761
+LOAD_NODE_Y: 4901
+LOAD_VALU_Y: -130000       # N
+
+# End conditions
+NUM_ITER   : 50
+NORMAL_MAX : 100         # MPa
+SHEAR_MAX  : 100         # MPa
+VOL_FRAC   : 0.20
+
+# Grey-scale filter (GSF)
+P_FAC      : 3
+Q_FAC      : 2.5
+ETA        : 0.5
+FILT_RAD   : 1.5
