@@ -1,73 +1,72 @@
 # Dependencies
-It shouldn't take you more than a few minutes to download and install everything.
+This version features more dependencies than the original one, but most are
+relatively easy do get (meaning, by using pip).
 
-## All platforms
-Install Python 2.7.13 (32 or 64 bit) - make sure your 'bitness' is correct
-when downloading the other packages listed further below.
-Download Python from the official Python site.
-If you're using Linux or Mac, you most
-probably have Python installed already.
+The main dependency is the sparse matrix direct solver [MUMPS](http://mumps.enseeiht.fr/index.php?page=home).
+For this package, you have to install MUMPS along with MPI (or OpenMPI). On Linux
+and Mac you can install it more easily using [Homebrew/Linuxbrew](https://brew.sh/).
+Install it with:
 
-If you want to know on what platform
-you are, start Python and type:
-```python
-import platform
-platform.architecture()
+```bash
+brew tap brewsci/num
+brew install brewsci-mumps
 ```
 
-ToPy requires Python 2.7 because of its dependence on
-Pysparse, which is only available in binary format for Python 2.7 on
-Windows systems and is too much trouble/bother to compile from scratch
-if you want to get up and running quickly. I've started to look into replacing
-Pysparse with something else that's as quick -- it will take me a while because
-I have a 'real' job.
+Make sure you have both a C and a FORTRAN compiler installed. GCC has both by
+default. 
 
-The same is of course not true for Linux/Mac systems, so you may very well be
-able to get ToPy to work with Python 3.x -- I've not tried.
+On Windows, you may have to compile MUMPS yourself. [This repo](https://github.com/scivision/mumps)
+maintains a fork which allows you to build MUMPS using CMake, and may be the
+better option. Just remember you need to build it with MPI support.
 
-**Consider to use a virtual Python 2.7 environment, using `pyenv` or `conda`
-or one of the other tools available to set up virtual environments for Python.**
+Other dependencies are Python packages, you may get them with `pip`:
 
-## Windows
-1. Make sure Python is in your 'Path' Environment Variables. *How?*
-If you type 'python' in
-a command prompt (cmd window) and you don't get an error, you're OK.  
-	1. If you don't know how to add Python to 'Path', please search the web
-on how to do it. Tip: Start a new cmd window after you've made changes to the
-'Path' Environment Variable.
-	2. Check if Python works by typing it into a cmd shell.
-	3. Check if `pip` works, also by typing it into a cmd shell. If it
-doesn't work, add Python27\Scripts to the Environment Variables,
-open a new cmd shell and check if it works.
-	4. Note:- When using `pip`, run `cmd` as Administrator.
-	5. Installing with `pip` is easy:
-	`pip install <package>`
-2. Download NumPy+MKL for Python 2.7 from Christoph Gohlke's website:
-http://www.lfd.uci.edu/~gohlke/pythonlibs/#numpy
-and install with `pip`
-3. Download Pysparse, also from
-http://www.lfd.uci.edu/~gohlke/pythonlibs/#pysparse
-and install with `pip`
-4. Install matplotlib via `pip`
-5. Install SymPy via `pip`
-6. Install PyVTK via `pip`
+```bash
+pip install typing pathlib matplotlib sympy numpy pyvtk scipy cython mpi4py pymumps numexpr
+```
 
-## Linux
-Install equivalent packages as for Windows above via `pip` or by other means
-(e.g., apt-get, yum, rpm,...). So, install he following:
-1. NumPy+MKL
-2. Pysparse
-3. matplotlib
-4. SymPy
-5. PyVTK
+Be aware that you may need to point to MPI's and MUMPS's include and binary files
+to be able to install `mpi4py`and `pymumps`. If you installed them using Linuxbrew,
+they will be at:
 
-## Mac
-Install equivalent packages as for Linux above via `pip` or by other means.
+    /home/linuxbrew/.linuxbrew/opt/brewsci-mumps/lib
+    /home/linuxbrew/.linuxbrew/opt/brewsci-mumps/include
+    /home/linuxbrew/.linuxbrew/opt/openmpi/lib
+    /home/linuxbrew/.linuxbrew/opt/openmpi/include
+    /home/linuxbrew/.linuxbrew/opt/openmpi/bin
 
-Installing matplotlib and SymPy via other 'official' channels should
-also work fine (in that ToPy should still work).
+Add the last one to your `PATH` with:
 
-If everything installed correctly, you're ready to install ToPy.
+```bash
+export PATH="/home/linuxbrew/.linuxbrew/opt/openmpi/bin:$PATH"
+```
+
+And then run, in this order:
+
+```bash
+pip install mpi4py --global-option="build_ext" \
+  --global-option="-I/home/linuxbrew/.linuxbrew/opt/openmpi/include" \
+  --global-option="-L/home/linuxbrew/.linuxbrew/opt/openmpi/lib"
+pip install pymumps --global-option="build_ext" \
+  --global-option="-I/home/linuxbrew/.linuxbrew/opt/brewsci-mumps/include" \
+  --global-option="-L/home/linuxbrew/.linuxbrew/opt/brewsci-mumps/lib"
+```
+
+It is a good idea to keep OpenMPI's `bin`folder in your path to run ToPy, especially
+because you need `mpiexec` to run MUMPS in parallel. To do that, I recommend using
+a virtual environment and include them in its `activate` file. For example:
+
+```bash
+python3 -m venv ~/venv-topy
+gedit ~/venv-topy/bin/activate
+```
+
+And then add:
+
+    PATH="/home/linuxbrew/.linuxbrew/opt/openmpi/bin:$PATH"
+
+After the function `deactivate ()`. You can then enter the virtual environment
+with `source ~/venv-topy/bin/activate` and leave it with `deactivate`.
 
 # Installing ToPy
 Download the stable topy release or clone.
@@ -75,11 +74,16 @@ Download the stable topy release or clone.
 CD into the 'topy' directory (where 'setup.py' is located) and
 in a terminal ('cmd' on Windows), type:
 
-	python setup.py install
+```bash
+python setup.py install
+```
 
-or if you want to install locally, type:
+The command above is the one to use if you are using a virtual environment too.
+If you want to install locally, type:
 
-	python setup.py install --user
+```bash
+python setup.py install --user
+```
 
 You may require Administrator rights on Windows, depending on your setup.
 
@@ -89,34 +93,7 @@ If there aren't any errors, then ToPy is installed. Congratulations!
 See https://github.com/williamhunter/topy/wiki/Tutorials
 
 # First run of ToPy
-## Element stiffness matrices
-The first time you run ToPy after a new install you'll see the
-following in your terminal:
-
-	It seems as though all or some of the element stiffness matrices
-	do not exist. Creating them...
-	This is usually only required once and may take a few minutes.
-	SymPy is integrating: K for Q4bar...
-	Created C:\Users\William\Programming\ToPy\topy\data\Q4bar.K (stiffness matrix).
-	SymPy is integrating: K for Q4...
-	Created C:\Users\William\Programming\ToPy\topy\data\Q4.K (stiffness matrix).
-	SymPy is integrating: K for Q5B...
-	Created C:\Users\William\Programming\ToPy\topy\data\Q5B.K (stiffness matrix).
-	SymPy is integrating: K for Q4T...
-	Created C:\Users\William\Programming\ToPy\topy\data\Q4T.K (stiffness matrix).
-	SymPy is integrating: K for H8...
-	Created C:\Users\William\Programming\ToPy\topy\data\H8.K (stiffness matrix).
-	SymPy is integrating: K for H18B...
-	Created C:\Users\William\Programming\ToPy\topy\data\H18B.K (stiffness matrix).
-	SymPy is integrating: K for H8T...
-	Created C:\Users\William\Programming\ToPy\topy\data\H8T.K (stiffness matrix).
-
-You won't (shouldn't) see it again, even if ToPy is updated, since these
-files shouldn't need to change. You can create the stiffness matrices without
-solving a problem by simply running 'optimise.py' in the 'scripts' folder.
-
---
-
-William Hunter
-Created: 2017-08-21
-Last update: 2020-04-26
+The original ToPy created all element matrices on the first run and stored them
+for future use. This version introduces the possibility to use material properties
+such as Young's modulus and thermal conductivity, so now the element required by
+the TPD file will be generated with each execution.

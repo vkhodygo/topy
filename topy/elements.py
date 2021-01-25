@@ -4,8 +4,9 @@
 #
 # To define your own finite elements, see Python scripts in 'data' directory.
 #
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 from os import path, system

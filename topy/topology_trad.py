@@ -2,10 +2,11 @@
 # =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
 # conditions. Data is read from an input file, see 'examples' directory.
+# Uses traditional SIMP topology optimization.
 #
 # Authors: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
-# Copyright (C) 2020, Tarcísio L. de Oliveira
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 import os

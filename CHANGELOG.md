@@ -4,7 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.0.0]
+### Added
+- New optimization algorithm.
+- New version of TPD file format (v2020).
+### Refactored
+- Upgraded to Python 3.
+- Switched from PySparse to SciPy with MUMPS and MPI.
+- Optimized code where possible.
+- Used multiprocessing where possible.
+
+## [v0.4.1]
 ### Added
 - Add `pytest` module that tests all examples in the `examples/` directory.
 - Add GitHub action to trigger `pytest` on pull request and push to `master`.

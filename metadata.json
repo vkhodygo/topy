@@ -1,8 +1,8 @@
 {
     "name": "topology-optimization",
-    "version": "0.4.0",
-    "author": "William Hunter",
-    "author_email": "williamhunter@users.noreply.github.com",
+    "version": "1.0.0",
+    "author": "Tarcisio Ladeia de Oliveira",
+    "author_email": "tarcisio.oliveira@usp.br",
     "description": "Topology optimization with Python",
-    "url": "https://github.com/williamhunter/topy"
+    "url": "https://github.com/TarcLO/topy"
 }

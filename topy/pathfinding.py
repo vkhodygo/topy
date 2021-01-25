@@ -6,7 +6,7 @@
 # placed on nodes).
 #
 # Author: Tarcísio L. de Oliveira
-# Copyright (C) 2020, Tarcísio L. de Oliveira
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 

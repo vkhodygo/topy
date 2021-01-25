@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env python
 
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # This script handles both number of iterations and change stop criteria runs
 
 # Import required modules:

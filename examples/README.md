@@ -3,9 +3,11 @@
 Go to the 'scripts' directory and find the 'optimise.py' file, it
 reads and loads a TPD (ToPy Problem Definition) file.
 
-You can (obviously) change `optimise.py` to suit your needs.
+You can (obviously) change `optimise.py` to suit your needs. Be aware that it uses MPI.
 
-The 'mbb_beam' directory is probably the best place to start experimenting.
+You can check the folder 'new' for examples using the new algorithm. All of the examples
+used in the original ToPy are present in the 'legacy' folder and left unchanged. They
+should be working just the same.
 
 ## Note to Windows users
 > You have to copy the 'optimise.py' type files to each example directory. Under
@@ -15,9 +17,13 @@ The 'mbb_beam' directory is probably the best place to start experimenting.
 # Running the 'optimise.py' script
 In a terminal/console, type:
 
-	python optimise.py <filename>.tpd
+	$ python optimise.py <filename>.tpd
 
-in the relevant example directory.
+for single threaded FEA, or:
+
+    $ mpirun -n 2 python3 -m mpi4py optimise.py <filename>.tpd
+
+for multiprocessing (2 processes, in this case), in the relevant example directory.
 
 # Animations
 All 3D animations were created with the help of *ParaView 3* and *ImageMagick*. In *ParaView*, save the animation as a sequence of PNGs, or directly as an AVI (produces larger files). *gifsicle* is another option to produce GIFs from stills.

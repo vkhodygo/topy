@@ -4,12 +4,11 @@
 #
 # Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
-# Copyright (C) 2020, Tarcísio L. de Oliveira
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 
 import numpy as np
-#from pysparse import spmatrix
 from scipy import sparse
 
 from .utils import get_logger
