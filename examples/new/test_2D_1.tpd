@@ -7,20 +7,20 @@ TO_TYPE:     gen          # or trad, for traditional approach
 ELEM_E:      186          # GPa
 ELEM_NU:     0.29
 ELEM_TC:     51.9         # W/(m*K)
-ELEM_L:      25           # mm (half-length of element)
+ELEM_L:      10           # mm (half-length of element)
 THICKNESS:   50	          # mm
 
 PROB_TYPE:   comp
 PROB_NAME:   test_1
 DOF_PN:      2
 ELEM_K:      Q4
-NUM_ELEM_X:  80
-NUM_ELEM_Y:  60
+NUM_ELEM_X:  200
+NUM_ELEM_Y:  150
 NUM_ELEM_Z:  0
-FXTR_NODE_X: 1|61
-FXTR_NODE_Y: 1|61
-LOAD_NODE_Y: 4911
-LOAD_VALU_Y: -35000       # N
+FXTR_NODE_X: 1|151
+FXTR_NODE_Y: 1|151
+LOAD_NODE_Y: 30276
+LOAD_VALU_Y: -15000       # N
 
 # End conditions
 NUM_ITER   : 50
