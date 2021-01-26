@@ -41,6 +41,7 @@ def optimise(fname):
     if gen and rank != 0:
         t = topy.TopologyGen()
         t.topydict['TO_TYPE'] = "gen"
+        t.probtype = "comp"
         t.chgstop = -1
         t.numiter = 0
     t.topydict['TO_TYPE'] = comm.bcast(t.topydict['TO_TYPE'], root=0)
