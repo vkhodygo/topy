@@ -390,7 +390,7 @@ class TopologyGen:
                                     strain_vec = np.dot(B[i], self.d[e2sdofmap])
 
                                     s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
-                                    self.h_n[nodes[i]] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
+                                    self.h_n[nodes[i]] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax, self.h_n[nodes[i]]])
 
                 else:
                     B = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
@@ -410,7 +410,7 @@ class TopologyGen:
                                         s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
                                         hs = np.sqrt(4*np.amax(s[:3])/(np.pi*self.Smax))
                                         ht = np.sqrt(32*np.amax(s[3:])/(9*np.pi*self.Tmax))
-                                        self.h_n[nodes[i]] = max(hs, ht)
+                                        self.h_n[nodes[i]] = np.amax([hs, ht, self.h_n[nodes[i]]])
 
 
             # Calculate strain and stress values:

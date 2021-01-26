@@ -415,6 +415,7 @@ class TopologyTrad:
                 }
                 create_3d_geom(stress_img, **params)
 
+
     def filter_sens_sigmund(self):
         """
         Filter the design sensitivities using Sigmund's heuristic approach.
