@@ -337,6 +337,9 @@ class TopologyTrad:
 
         ctx.destroy() # Cleanup
 
+        # Increment internal iteration counter
+        self.itercount += 1
+
         if rank == 0:
             # Update displacement vectors:
             self.d[self.freedof] = self.dfree
@@ -345,7 +348,6 @@ class TopologyTrad:
 
             # The following part does not really make sense for heat problems
             if self.probtype == 'heat':
-                self.itercount += 1
                 return
 
             _L = self.topydict['ELEM_L']
@@ -392,8 +394,6 @@ class TopologyTrad:
             # Maximum stress reached
             self.stress = np.max(self.stress_mat)
 
-            # Increment internal iteration counter
-            self.itercount += 1
 
             # Display stress map
             stress_img = self.stress_mat.copy()/self.stress

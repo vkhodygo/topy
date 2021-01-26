@@ -15,7 +15,7 @@ def optimise(fname):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
-    # MPI hack to prevent lambda serialization
+    # MPI hack to prevent lambda serialization (unsupported by mpi4py)
     t = topy.TopologyTrad()
     t.topydict['TO_TYPE'] = "trad"
     t.chgstop = -1
@@ -50,8 +50,7 @@ def optimise(fname):
     t.numiter = comm.bcast(t.numiter, root=0)
 
     topy.optimise(t)
-
-
+    
 if __name__ == '__main__':
     optimise(argv[1])
 

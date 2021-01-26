@@ -65,16 +65,28 @@ class TopologyGen:
     # === Public methods ===
     # ======================
     def preprocess_space(self):
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
         if self.probtype != "mech":
-            Kfree = self.createK()
+            if rank == 0:
+                Kfree = self.createK()
+            else:
+                Kfree = None
+
             self.fea(Kfree)
-            if self.probtype == "comp":
-                logger.info("\nBase stress: %3.1f MPa\n" % (self.stress*1e-6))
-                self.expand()
-            self.desvars = self.volfrac*self.desvars
+
+            if rank == 0:
+                if self.probtype == "comp":
+                    logger.info("\nBase stress: %3.1f MPa (Von Mises)" % (self.stress*1e-6))
+                    logger.info("Max height: %3.1f elements\n" % np.amax(self.h_n))
+                    self.expand()
+                self.desvars = self.volfrac*self.desvars
         else:
-            self.desvars = self.desvars + self.volfrac
-        Kfree = self.preprocessK()
+            if rank == 0:
+                self.desvars = self.desvars + self.volfrac
+
+        if rank == 0:
+            Kfree = self.preprocessK()
 
         return Kfree
 
@@ -362,6 +374,8 @@ class TopologyGen:
 
         ctx.destroy() # Cleanup
 
+        # Increment internal iteration counter
+        self.itercount += 1
 
         if rank == 0:
 
@@ -372,7 +386,6 @@ class TopologyGen:
 
             # The following part does not really make sense for heat problems
             if self.probtype == 'heat':
-                self.itercount += 1
                 return
 
             _L = self.topydict['ELEM_L']
@@ -456,8 +469,6 @@ class TopologyGen:
             # Maximum stress reached
             self.stress = np.max(self.stress_mat)
 
-            # Increment internal iteration counter
-            self.itercount += 1
 
             # Display stress map
             stress_img = self.stress_mat.copy()/self.stress

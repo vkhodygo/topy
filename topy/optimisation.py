@@ -34,7 +34,7 @@ def optimise(topology, save=True, dir='./iterations'):
             makedirs(dir)
         etas_avg = []
 
-# Optimising function:
+    # Optimising function:
     def _optimise_trad(t):
         t.fea()
     
@@ -126,9 +126,14 @@ def optimise(topology, save=True, dir='./iterations'):
 
     Kfree = None
     if rank == 0:
-        if topology.topydict["TO_TYPE"] == "gen":
-            Kfree = topology.preprocess_space()
+        ti = time()
 
+    if topology.topydict["TO_TYPE"] == "gen":
+        Kfree = topology.preprocess_space()
+        if rank == 0:
+            tp = time()
+
+    if rank == 0:
         if topology.topydict["PROB_TYPE"] != "heat":
             # Create (plot) initial design domain:
             logger.info('\n' + '='*90)
@@ -147,7 +152,6 @@ def optimise(topology, save=True, dir='./iterations'):
                 'P_FAC', 'Q_FAC', 'Ave ETA', 'Vol. frac.')
             logger.info(str_ % format_)
             logger.info('-'*80)
-        ti = time()
 
     # Optimize, and check for stop conditions
     if topology.topydict["TO_TYPE"] == "trad":
@@ -168,15 +172,13 @@ def optimise(topology, save=True, dir='./iterations'):
     if rank == 0:
         te = time()
 
-        # Print solid-void ratio info:
-        #logger.info('\nSolid plus void to total elements fraction = %3.5f' %\
-        #    (topology.svtfrac))
         # Print iteration info:
-
-        logger.info('%d iterations took %3.3f minutes (%3.3f seconds/iteration)'\
-            %(topology.itercount, (te - ti) / 60, (te - ti) / topology.itercount))
+        if topology.topydict['TO_TYPE'] == 'trad':
+            logger.info('%d iterations took %3.3f minutes (%3.3f seconds/iteration)'\
+                %(topology.itercount, (te - ti) / 60, (te - ti) / topology.itercount))
+        else:
+            logger.info('%d iterations took %3.3f minutes (%3.3f seconds/iteration, %3.3f seconds in preprocessing stage)'\
+                %(topology.itercount, (te - ti) / 60, (te - tp) / topology.itercount, (tp - ti)))
         logger.info('Average of all ETA\'s = %3.3f (average of all a\'s = %3.3f)' \
             % (array(etas_avg).mean(), 1/array(etas_avg).mean() - 1))
-
-
 
