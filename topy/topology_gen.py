@@ -79,7 +79,26 @@ class TopologyGen:
                 if self.probtype == "comp":
                     logger.info("\nBase stress: %3.1f MPa (Von Mises)" % (self.stress*1e-6))
                     logger.info("Max height: %3.1f elements\n" % np.amax(self.h_n))
+
                     self.expand()
+                    if self.dofpn < 3 and self.nelz == 0:
+                        params = {
+                            'prefix': self.probname,
+                            'iternum': 0,
+                            'time': 'none',
+                            'filetype': 'png',
+                            'dir': 'iterations'
+                        }
+                        create_2d_imag(self.desvars, **params)
+                    else:
+                        params = {
+                            'prefix': self.probname,
+                            'iternum': 0,
+                            'time': 'none',
+                            'dir': 'iterations'
+                        }
+                        create_3d_geom(self.desvars, **params)
+
                 self.desvars = self.volfrac*self.desvars
         else:
             if rank == 0:
