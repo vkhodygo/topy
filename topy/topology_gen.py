@@ -213,24 +213,24 @@ class TopologyGen:
                     (self.nely + 1))
                 self.desvars = np.zeros((self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nely, self.nelx))
-                self.h_n = np.zeros((self.nely+1, self.nelx+1))
+                self.h_n = np.zeros((self.nely, self.nelx))
             else:
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1) * (self.nelz + 1))
                 self.desvars = np.zeros((self.nelz, self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
-                self.h_n = np.zeros((self.nelz+1, self.nely+1, self.nelx+1))
+                self.h_n = np.zeros((self.nelz, self.nely, self.nelx))
         elif self.dofpn == 2:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
             self.desvars = np.zeros((self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nely, self.nelx))
-            self.h_n = np.zeros((self.nely+1, self.nelx+1))
+            self.h_n = np.zeros((self.nely, self.nelx))
         else:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) *\
                 (self.nely + 1) * (self.nelz + 1))
             self.desvars = np.zeros((self.nelz, self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
-            self.h_n = np.zeros((self.nelz+1, self.nely+1, self.nelx+1))
+            self.h_n = np.zeros((self.nelz, self.nely, self.nelx))
         self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
         self.r = np.zeros_like(self.alldof, dtype=np.float32) #  Load vector
@@ -396,6 +396,7 @@ class TopologyGen:
                     for _y in range(self.nely):
                         for _x in range(self.nelx):
                             if self.desvars[_y, _x] > 0:
+                                h = [0.0]*4
                                 e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                             (_y + _x * (self.nely + 1))
                                 nodes = [(_y, _x), (_y+1,_x), (_y,_x+1), (_y+1,_x+1)]
@@ -403,7 +404,10 @@ class TopologyGen:
                                     strain_vec = np.dot(B[i], self.d[e2sdofmap])
 
                                     s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
-                                    self.h_n[nodes[i]] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax, self.h_n[nodes[i]]])
+
+                                    h[i] = np.amax([s[0]/self.Smax, s[1]/self.Smax, s[2]/self.Tmax])
+
+                                self.h_n[_y, _x] = np.amax(h)
 
                 else:
                     B = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
@@ -412,6 +416,7 @@ class TopologyGen:
                         for _y in range(self.nely):
                             for _x in range(self.nelx):
                                 if self.desvars[_z, _y, _x] > 0:
+                                    h = [0.0]*8
                                     e2sdofmap = self.e2sdofmapi + self.dofpn *\
                                                 (_y + _x * (self.nely + 1) + _z *\
                                                 (self.nelx + 1) * (self.nely + 1))
@@ -423,7 +428,10 @@ class TopologyGen:
                                         s = np.abs(np.dot(self.Ce, strain_vec)) # desvars always 1 in this case
                                         hs = np.sqrt(4*np.amax(s[:3])/(np.pi*self.Smax))
                                         ht = np.sqrt(32*np.amax(s[3:])/(9*np.pi*self.Tmax))
-                                        self.h_n[nodes[i]] = np.amax([hs, ht, self.h_n[nodes[i]]])
+
+                                        h[i] = np.amax([hs, ht])
+
+                                    self.h_n[_z, _y, _x] = np.amax(h)
 
 
             # Calculate strain and stress values:
@@ -816,20 +824,20 @@ class TopologyGen:
         warn_width = False
         warn_height = False
         if self.nelz == 0: #  2D problem
-            for nlx in range(self.nelx+1):
-                for nly in range(self.nely+1):
+            for nlx in range(self.nelx):
+                for nly in range(self.nely):
                     if self.h_n[nly, nlx] > 0:
                         h = np.ceil(self.h_n[nly, nlx])
                         h += h % 2 # Make h even -> makes resulting structures both safer and more aesthetically pleasing
 
-                        # create "box" repositioning the center into the node
-                        umin = int(np.maximum(nlx - 0.5 - h/2, 0))
-                        umax = int(np.minimum(nlx - 0.5 + h/2 + 1, self.nelx))
-                        vmin = int(np.maximum(nly - 0.5 - h/2, 0))
-                        vmax = int(np.minimum(nly - 0.5 + h/2 + 1, self.nely))
+                        # create "box" around element
+                        umin = int(np.maximum(nlx - h/2, 0))
+                        umax = int(np.minimum(nlx + h/2 + 1, self.nelx))
+                        vmin = int(np.maximum(nly - h/2, 0))
+                        vmax = int(np.minimum(nly + h/2 + 1, self.nely))
                         for i in range(umin, umax):
                             for j in range(vmin, vmax):
-                                if (i-nlx+0.5)**2 + (j-nly+0.5)**2 <= (h/2)**2:
+                                if (i-nlx)**2 + (j-nly)**2 <= (h/2)**2:
                                     self.desvars[j, i] = SOLID
 
         else: #  3D problem
@@ -840,17 +848,17 @@ class TopologyGen:
                             h = np.ceil(self.h_n[nlz, nly, nlx])
                             h += h % 2 # Make h even -> makes resulting structures both safer and more aesthetically pleasing
 
-                            # create "box" repositioning the center into the node
-                            umin = int(np.maximum(nlx - 0.5 - h/2, 0))
-                            umax = int(np.minimum(nlx - 0.5 + h/2 + 1, self.nelx))
-                            vmin = int(np.maximum(nly - 0.5 - h/2, 0))
-                            vmax = int(np.minimum(nly - 0.5 + h/2 + 1, self.nely))
-                            wmin = int(np.maximum(nlz - 0.5 - h/2, 0))
-                            wmax = int(np.minimum(nlz - 0.5 + h/2 + 1, self.nelz))
+                            # create "box" around element
+                            umin = int(np.maximum(nlx - h/2, 0))
+                            umax = int(np.minimum(nlx + h/2 + 1, self.nelx))
+                            vmin = int(np.maximum(nly - h/2, 0))
+                            vmax = int(np.minimum(nly + h/2 + 1, self.nely))
+                            wmin = int(np.maximum(nlz - h/2, 0))
+                            wmax = int(np.minimum(nlz + h/2 + 1, self.nelz))
                             for i in range(umin, umax):
                                 for j in range(vmin, vmax):
                                     for k in range(wmin, wmax):
-                                        if (i-nlx+0.5)**2 + (j-nly+0.5)**2 + (k-nlz+0.5)**2 <= (h/2)**2:
+                                        if (i-nlx)**2 + (j-nly)**2 + (k-nlz)**2 <= (h/2)**2:
                                             self.desvars[k, j, i] = SOLID
 
     def preprocessK(self):
