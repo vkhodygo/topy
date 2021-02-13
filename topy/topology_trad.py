@@ -179,21 +179,21 @@ class TopologyTrad:
                 self.e2sdofmapi = self.e2sdofmapi[0:4]
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1))
-                self.desvars = np.ones((self.nely, self.nelx))
+                self.desvars = self.volfrac * np.ones((self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nely, self.nelx))
             else:
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1) * (self.nelz + 1))
-                self.desvars = np.ones((self.nelz, self.nely, self.nelx))
+                self.desvars = self.volfrac * np.ones((self.nelz, self.nely, self.nelx))
                 self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         elif self.dofpn == 2:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
-            self.desvars = np.ones((self.nely, self.nelx))
+            self.desvars = self.volfrac * np.ones((self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nely, self.nelx))
         else:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) *\
                 (self.nely + 1) * (self.nelz + 1))
-            self.desvars = np.ones((self.nelz, self.nely, self.nelx))
+            self.desvars = self.volfrac * np.ones((self.nelz, self.nely, self.nelx))
             self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
         self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
