@@ -1,6 +1,6 @@
 {
     "name": "topology-optimization",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "author": "Tarcisio Ladeia de Oliveira",
     "author_email": "tarcisio.oliveira@usp.br",
     "description": "Topology optimization with Python",
