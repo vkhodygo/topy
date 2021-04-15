@@ -3,21 +3,12 @@ This version features more dependencies than the original one, but most are
 relatively easy do get (meaning, by using pip).
 
 The main dependency is the sparse matrix direct solver [MUMPS](http://mumps.enseeiht.fr/index.php?page=home).
-For this package, you have to install MUMPS along with MPI (or OpenMPI). On Linux
-and Mac you can install it more easily using [Homebrew/Linuxbrew](https://brew.sh/).
-Install it with:
+For this package, you have to install MUMPS along with MPI (or OpenMPI).
 
-```bash
-brew tap brewsci/num
-brew install brewsci-mumps
-```
-
-Make sure you have both a C and a FORTRAN compiler installed. GCC has both by
-default. 
-
-On Windows, you may have to compile MUMPS yourself. [This repo](https://github.com/scivision/mumps)
-maintains a fork which allows you to build MUMPS using CMake, and may be the
-better option. Just remember you need to build it with MPI support.
+You may be able to find MUMPS in your OS's package system (if it has one), but 
+if you don't, or just prefer to compile yourself, you can find a CMake fork at 
+[This repo](https://github.com/scivision/mumps) which makes it straightforward
+to install (although it requires a CMake build with minimum version of 3.13).
 
 Other dependencies are Python packages, you may get them with `pip`:
 
@@ -27,13 +18,16 @@ pip install typing pathlib matplotlib sympy numpy pyvtk scipy cython mpi4py pymu
 
 Be aware that you may need to point to MPI's and MUMPS's include and binary files
 to be able to install `mpi4py`and `pymumps`. If you installed them using Linuxbrew,
-they will be at:
+for example, then they will be at:
 
     /home/linuxbrew/.linuxbrew/opt/brewsci-mumps/lib
     /home/linuxbrew/.linuxbrew/opt/brewsci-mumps/include
     /home/linuxbrew/.linuxbrew/opt/openmpi/lib
     /home/linuxbrew/.linuxbrew/opt/openmpi/include
     /home/linuxbrew/.linuxbrew/opt/openmpi/bin
+
+If you compiled the source and installed it without specifying install location,
+you can find it at the build folder's `install_manifest.txt`.
 
 Add the last one to your `PATH` with:
 
@@ -52,9 +46,10 @@ pip install pymumps --global-option="build_ext" \
   --global-option="-L/home/linuxbrew/.linuxbrew/opt/brewsci-mumps/lib"
 ```
 
-It is a good idea to keep OpenMPI's `bin`folder in your path to run ToPy, especially
-because you need `mpiexec` to run MUMPS in parallel. To do that, I recommend using
-a virtual environment and include them in its `activate` file. For example:
+It is a good idea to keep OpenMPI's `bin` folder in your path to run ToPy, especially
+because you need `mpiexec` in order to run MUMPS in parallel. To do that, I
+recommend using a virtual environment and include them in its `activate` file.
+For example:
 
 ```bash
 python3 -m venv ~/venv-topy
