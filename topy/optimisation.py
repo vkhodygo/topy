@@ -66,7 +66,7 @@ def optimise(topology, save=True, dir='./iterations'):
 
             
             if topology.topydict["PROB_TYPE"] != "heat":
-                str_ = '%4i  | %3.6e | %3.3f | %3.4e | %3.3f | %3.3f |  %1.3f  |   %1.4f   | %3.1f'
+                str_ = '%4i  | %3.6e | %3.3f | %3.4e | %3.3f | %3.3f |  %1.3f  |   %1.4f   | %3.3f'
                 format_ = (t.itercount, t.objfval, t.desvars.mean(),\
                     t.change, t.p, t.q, t.eta.mean(), t.svtfrac, t.stress*1e-6)
                 logger.info(str_ % format_)
@@ -110,7 +110,7 @@ def optimise(topology, save=True, dir='./iterations'):
 
             
             if topology.topydict["PROB_TYPE"] != "heat":
-                str_ = '%4i  | %3.6e | %3.3f | %3.4e | %3.3f | %3.3f |  %1.3f  |   %1.4f   | %3.1f'
+                str_ = '%4i  | %3.6e | %3.3f | %3.4e | %3.3f | %3.3f |  %1.3f  |   %1.4f   | %3.3f'
                 format_ = (t.itercount, t.objfval, t.desvars.mean(),\
                     t.change, t.p, t.q, t.eta.mean(), t.svtfrac, t.stress*1e-6)
                 logger.info(str_ % format_)

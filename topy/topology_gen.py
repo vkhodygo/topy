@@ -880,6 +880,30 @@ class TopologyGen:
                                         if (i-nlx)**2 + (j-nly)**2 + (k-nlz)**2 <= (h/2)**2:
                                             self.desvars[k, j, i] = SOLID
 
+        dims = self.desvars.shape
+        if self.pasv.any() or self.actv.any():
+            flatx = self.desvars.flatten()
+            idx = []
+            if self.nelz == 0:
+                y, x = dims
+                for j in range(x):
+                    for k in range(y):
+                        idx.append(k*x + j)
+            else:
+                z, y, x = dims
+                for i in range(z):
+                    for j in range(x):
+                        for k in range(y):
+                            idx.append(k*x + j + i*x*y)
+            if self.pasv.any():
+                pasv = np.take(idx, self.pasv) #  new indices
+                np.put(flatx, pasv, VOID) #  = zero density
+            if self.actv.any():
+                actv = np.take(idx, self.actv) #  new indices
+                np.put(flatx, actv, SOLID) #  = solid
+            self.desvars = flatx.reshape(dims)
+
+
     def preprocessK(self):
         """
         Remove elements which will not be used in the problem.
