@@ -21,7 +21,7 @@ if not os.environ.get("DISPLAY"):
 from pylab import axis, close, cm, figure, imshow, savefig, title
 
 __all__ = ['create_2d_imag', 'create_3d_geom', 'node_nums_2d', 'node_nums_3d',
-'create_2d_msh','create_3d_msh']
+'create_2d_msh','create_3d_msh', 'save_3d_array']
 
 def create_2d_imag(x, **kwargs):
     """
@@ -118,6 +118,19 @@ def create_3d_geom(x, **kwargs):
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as geometry:
     _write_geom(x, fname)
+
+
+def save_3d_array(x, iternum, **kwargs):
+    with open(os.path.join("iterations", str(iternum) + "_array.txt"), "w") \
+         as file:
+        file.write(str(x.shape[0])+","+str(x.shape[1])+"," + str(x.shape[2]))
+        file.write(os.linesep)
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                for k in range(x.shape[2]):
+                    file.write(str(x[i][j][k]))
+                    file.write(",")
+
 
 def create_2d_msh(nelx, nely, fname):
     """

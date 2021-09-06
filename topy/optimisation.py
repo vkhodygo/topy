@@ -34,6 +34,7 @@ def optimise(topology, save=True, dir='./iterations'):
             }
             if save:
                 create_3d_geom(t.desvars, **params)
+                save_3d_array(t.desvars, **params)
         else:
             params = {
                 'prefix': t.probname,
