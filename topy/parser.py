@@ -235,6 +235,8 @@ def _tpd2vec(seq, dtype=float):
         if s.count('|'):
             values = [dtype(v) for v in s.split('|')]
             values[1] += 1
+            if len(values) == 2:
+                values.append(1)
             val = values[0]
             while val < values[1]:
                 finalvec.append(val)
@@ -248,7 +250,7 @@ def _tpd2vec(seq, dtype=float):
             try:
                 finalvec.append(dtype(s))
             except ValueError:
-                raise ValueError('%s is incorrectly specified' % seq)
+                pass
     return np.array(finalvec, dtype)
 
 def _dofvec(x, y, z, dofpn):
