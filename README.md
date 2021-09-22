@@ -12,16 +12,16 @@ As Mr. Hunter actually did most of the work by fully implementing the topology o
 
 You can check Mr. Hunter's dissertation [here](http://hdl.handle.net/10019.1/2648).
 
-Please refer to the [ToPy Wiki](https://github.com/TarcLO/topy/wiki) for further information.
+Please refer to the [ToPy Wiki](https://github.com/TarcisioLOliveira/topy/wiki) for further information.
 
 ## Example of a ToPy result
-An [example TPD file and solution/result](https://github.com/TarcLO/topy/wiki/Examples-of-ToPy-results)
+An [example TPD file and solution/result](https://github.com/TarcisioLOliveira/topy/wiki/Examples-of-ToPy-results)
 
 ## Installation
-Once you've downloaded the dependencies (see the [INSTALL](https://github.com/TarcLO/topy/blob/master/INSTALL.md)
+Once you've downloaded the dependencies (see the [INSTALL](https://github.com/TarcisioLOliveira/topy/blob/master/INSTALL.md)
 file) all you need to do is the following:
 
-Download the latest **stable release** from here: https://github.com/TarcLO/topy/releases/latest
+Download the latest **stable release** from here: https://github.com/TarcisioLOliveira/topy/releases/latest
 
 Then do
 
@@ -41,7 +41,7 @@ yourself with this if you just want to get some results.
 
 ### There are two ways of defining a problem
 1. **TPD file**: You define the problem with keywords
-(see [Help](https://github.com/TarcLO/topy/wiki/Help)) in a simple text file and solve via the command line. The text file must have the extension `.tpd`
+(see [Help](https://github.com/TarcisioLOliveira/topy/wiki/Help)) in a simple text file and solve via the command line. The text file must have the extension `.tpd`
 2. **Config dictionary**: This is similar to the TPD file approach, however,
 you define the problem directly in a Python file. While it still works, I wouldn't
 recommend it unless you are familiar with MPI.
@@ -105,7 +105,7 @@ Be aware that the new algorithm is only partially implemented for heat conductio
 and is not present for mechanism synthesis. Heat condunction also does not lead
 to stress calculations (as it does not have a clear analogous concept).
 
-You can read more about successful problem definition [here](https://github.com/TarcLO/topy/tree/master/templates).
+You can read more about successful problem definition [here](https://github.com/TarcisioLOliveira/topy/tree/master/templates).
 
 When the TPD file is defined, then the rest is simple. You can use the command line solution:
 
@@ -176,7 +176,7 @@ paraview <filename>.vtk
 ```
 
 ## Tutorials
-[Tutorials](https://github.com/TarcLO/topy/wiki/Tutorials)
+[Tutorials](https://github.com/TarcisioLOliveira/topy/wiki/Tutorials)
 
 ## How to cite ToPy
 If you've used ToPy in your research work or find it useful in any way, please consider to cite:
@@ -187,6 +187,6 @@ If you've used ToPy in your research work or find it useful in any way, please c
     year = {2021},
     publisher = {GitHub},
     journal = {GitHub repository},
-    howpublished = {\url{https://github.com/TarcLO/topy}},
+    howpublished = {\url{https://github.com/TarcisioLOliveira/topy}},
 }
 ```
