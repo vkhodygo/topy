@@ -24,6 +24,7 @@ def optimise(fname):
     gen = True
     # Set up ToPy:
     if rank == 0:
+        t.chgstop = -1
         d = parser.tpd_file2dict(fname)
 
         if d['TO_TYPE'] == "trad":
@@ -35,7 +36,6 @@ def optimise(fname):
             raise ValueError("Unknown topology optimization approach: {}".format(d['TO_TYPE']))
 
         t.set_top_params()
-        t.chgstop = -1
 
     gen = comm.bcast(gen, root=0)
     if gen and rank != 0:
