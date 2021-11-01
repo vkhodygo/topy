@@ -9,6 +9,7 @@
 import os
 import sys
 from datetime import datetime
+import struct
 
 from numpy import arange, asarray, hstack
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
@@ -118,6 +119,25 @@ def create_3d_geom(x, **kwargs):
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as geometry:
     _write_geom(x, fname)
+
+def save_3d_array(x, iternum, **kwargs):
+    with open(os.path.join("iterations", str(iternum) + "_topo_optd.bin"), "wb") as f:
+        f.write(struct.pack('qq', n_cells, 3))
+        xs = [[], [], []]
+        ds = []
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                for k in range(x.shape[2]):
+                    xs[0].append(i)
+                    xs[1].append(x.shape[1] - j - 1)
+                    xs[2].append(k)
+                    ds.append(x[i][j][k])
+        for k in [2, 1, 0]:
+            for i in range(len(xs)):
+                f.write(struct.pack('i', xs[k][i]))
+        f.write(struct.pack('qq', len(ds), 1))
+        for i in range(len(ds)):
+            f.write(struct.pack('d', ds[i]))
 
 def create_2d_msh(nelx, nely, fname):
     """
