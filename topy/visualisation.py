@@ -122,7 +122,6 @@ def create_3d_geom(x, **kwargs):
 
 def save_3d_array(x, iternum, **kwargs):
     with open(os.path.join("iterations", str(iternum) + "_topo_optd.bin"), "wb") as f:
-        f.write(struct.pack('qq', n_cells, 3))
         xs = [[], [], []]
         ds = []
         for i in range(x.shape[0]):
@@ -132,6 +131,7 @@ def save_3d_array(x, iternum, **kwargs):
                     xs[1].append(x.shape[1] - j - 1)
                     xs[2].append(k)
                     ds.append(x[i][j][k])
+        f.write(struct.pack('qq', len(xs[0]), 3))
         for k in [2, 1, 0]:
             for i in range(len(xs)):
                 f.write(struct.pack('i', xs[k][i]))
