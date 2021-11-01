@@ -22,7 +22,7 @@ if not os.environ.get("DISPLAY"):
 from pylab import axis, close, cm, figure, imshow, savefig, title
 
 __all__ = ['create_2d_imag', 'create_3d_geom', 'node_nums_2d', 'node_nums_3d',
-'create_2d_msh','create_3d_msh']
+'create_2d_msh','create_3d_msh','save_3d_array']
 
 def create_2d_imag(x, **kwargs):
     """
