@@ -8,14 +8,14 @@ from sys import argv
 import topy
 
 
-def optimise(fname):
+def optimise(fname, outdir):
     # Set up ToPy:
     t = topy.Topology()
     t.load_tpd_file(fname)
     t.set_top_params()
-    topy.optimise(t)
+    topy.optimise(t, dir=outdir)
 
 
 if __name__ == '__main__':
-    optimise(argv[1])
+    optimise(argv[1], argv[2])
 
