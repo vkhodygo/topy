@@ -2,4 +2,4 @@
 
 source ~/.bashrc
 conda activate topy
-python /topy/scripts/optimise.py $1
+python /topy/scripts/optimise.py $1 $2 $3
