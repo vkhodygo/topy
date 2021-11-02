@@ -8,6 +8,7 @@ from .visualisation import *
 from .topology import *
 
 import requests
+import timeit
 
 logger = get_logger(__name__)
 
@@ -22,10 +23,12 @@ def optimise(topology, save=True, dir='./iterations', apikey=''):
 
 # Optimising function:
     def _optimise(t):
+        start_time = timeit.default_timer()
         t.fea()
         t.sens_analysis()
         t.filter_sens_sigmund()
         t.update_desvars_oc()
+        elapsed = timeit.default_timer() - start_time
         # Below this line we print info and create images or geometry:
         if t.nelz:
             params = {
@@ -47,14 +50,16 @@ def optimise(topology, save=True, dir='./iterations', apikey=''):
             }
             if save:
                 create_2d_imag(t.desvars, **params)
-        if apikey:
+        if apikey != 'xxx':
             headers = {"Authorization": "Bearer " + apikey, "Content-Type": "application/json"}
             content = {"fields": {"name": t.probname, "iter": t.itercount, \
                     "objfunc": "%.6e" % t.objfval, "vol": "%.6e" % t.desvars.mean(), \
                     "p_fac": "%.6e" % t.p, "q_fac": "%.6e" % t.q, \
-                    "ave_eta": "%.6e" % t.eta.mean(), "sv_frac": "%.6e" % t.svtfrac}, \
+                    "ave_eta": "%.6e" % t.eta.mean(), "sv_frac": "%.6e" % t.svtfrac, \
+                    "time": int(round(elapsed * 1000))}, \
                     "typecast": True}
             r = requests.post('https://api.airtable.com/v0/appP6FlPzuE3hhNFU/Topo', headers=headers, json=content)
+            logger.info("Post to airtable: " + str(r.status_code))
 
         str_ = '%4i  | %3.6e | %3.3f | %3.4e | %3.3f | %3.3f |  %1.3f  |  %3.3f '
         format_ = (t.itercount, t.objfval, t.desvars.mean(),\
@@ -92,6 +97,7 @@ def optimise(topology, save=True, dir='./iterations', apikey=''):
         %(topology.itercount, (te - ti) / 60, (te - ti) / topology.itercount))
     logger.info('Average of all ETA\'s = %3.3f (average of all a\'s = %3.3f)' \
         % (array(etas_avg).mean(), 1/array(etas_avg).mean() - 1))
+
 
 
 
