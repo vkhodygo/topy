@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Functions in order to visualise 2D and 3D NumPy arrays.
 #
@@ -7,16 +8,29 @@
 # =============================================================================
 """
 
-
+import os
 
 import sys
 from datetime import datetime
+import struct
+
 from pylab import axis, close, cm, figure, imshow, savefig, title
-from numpy import arange, asarray, hstack
+from numpy import arange, asarray, hstack, uint8 
+
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
+from PIL import Image
+
+# Instruct matplotlib to use the 'Agg' if no display was detected, as matplotlib uses a GUI by default.
+#   From: https://stackoverflow.com/a/8258144/9954163.
+if not os.environ.get("DISPLAY"):
+    import matplotlib
+    matplotlib.use('Agg')
+from pylab import axis, close, cm, figure, imshow, savefig, title
 
 __all__ = ['create_2d_imag', 'create_3d_geom', 'node_nums_2d', 'node_nums_3d',
-'create_2d_msh','create_3d_msh']
+
+'create_2d_msh','create_3d_msh', 'save_3d_array']
+
 
 def create_2d_imag(x, **kwargs):
     """
@@ -53,14 +67,23 @@ def create_2d_imag(x, **kwargs):
     # === Start of Matplotlib commands ===
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
-    figure() # open a figure
-    if kwargs.has_key('title'):
-        title(kwargs['title'])
-        imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    axis('off')
+
+    # figure() # open a figure
+    # if kwargs.has_key('title'):
+    #     title(kwargs['title'])
+    #     imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
+    # imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
+    # axis('off')
+
     # ==================================
     # === End of Matplotlib commands ===
+    # ==================================
+    # ====================================
+    # === Start of Pillow commands ===
+    # ====================================
+    outim = Image.fromarray(uint8(255-255*x/x.max()))  
+    # ==================================
+    # === End of Pillow commands ===
     # ==================================
 
     # Set the filename component defaults:
@@ -70,8 +93,9 @@ def create_2d_imag(x, **kwargs):
     # Change the default filename based on keyword arguments, if necessary:
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as image:
-    savefig(fname, bbox_inches='tight')
-    close() # close the figure
+    # savefig(fname, bbox_inches='tight') # for matplotlib 
+    # close() # close the figure # for matplotlib 
+    outim.save(fname) # for Pillow 
 
 def create_3d_geom(x, **kwargs):
     """
@@ -113,6 +137,20 @@ def create_3d_geom(x, **kwargs):
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as geometry:
     _write_geom(x, fname)
+
+
+def save_3d_array(x, iternum, **kwargs):
+    with open(os.path.join(kwargs['dir'], "%s_%03d.bin" % (kwargs['prefix'], iternum)), "wb") as f:
+        ds = []
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                for k in range(x.shape[2]):
+                    ds.append(x[i][x.shape[1] - j - 1][k])
+        f.write(struct.pack('qqq', x.shape[2], x.shape[1], x.shape[0]))
+        f.write(struct.pack('qq', len(ds), 1))
+        for i in range(len(ds)):
+            f.write(struct.pack('d', ds[i]))
+
 
 def create_2d_msh(nelx, nely, fname):
     """
@@ -330,7 +368,9 @@ def _write_geom(x, fname):
         _write_legacy_vtu(x, fname)
     else:
         print('Other file formats not implemented, only legacy VTK.')
+
         #_write_vrml2(x, fname) # future
+
 
 def _write_legacy_vtu(x, fname):
     """
@@ -355,9 +395,9 @@ def _write_legacy_vtu(x, fname):
     except ValueError:
         sys.exit('Array dimensions not equal to 3, possibly 2-dimensional.\n')
 
-    for i in xrange(depth):
-        for j in xrange(rows):
-            for k in xrange(columns):
+    for i in range(depth):
+        for j in range(rows):
+            for k in range(columns):
                 if x[i,j,k] > THRESHOLD:
                     xculled.append(x[i,j,k])
                     points += (voxel_local_points + [i,j,k]).tolist()
@@ -408,3 +448,4 @@ def _fixiternum(s):
     return s
 
 # EOF visualisation.py
+

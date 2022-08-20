@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Parse a ToPy problem definition (TPD) file to a Python dictionary.
 #
@@ -8,7 +9,9 @@
 """
 
 import numpy as np
-from pysparse import spmatrix
+
+import scipy.sparse as sp_sparse
+#from pysparse import spmatrix
 
 from .utils import get_logger
 from .elements import *
@@ -98,17 +101,19 @@ def _parsev2007file(s):
     snew = [line.replace(' ', '') for line in snew]
     snew = list(filter(len, snew))
 
-    d = dict([line.split(':') for line in snew]) 
+    d = dict([line.split(':') for line in snew])
     return _parse_dict(d)
 
 
- 
+
 
 def _parse_dict(d):
        # Read/convert minimum required input and convert, else exit:
     d = d.copy()
     try:
+
         d['PROB_TYPE'] = d['PROB_TYPE'].lower()
+
         d['VOL_FRAC'] = float(d['VOL_FRAC'])
         d['FILT_RAD'] = float(d['FILT_RAD'])
         d['P_FAC'] = float(d['P_FAC'])
@@ -116,7 +121,9 @@ def _parse_dict(d):
         d['NUM_ELEM_Y'] = int(d['NUM_ELEM_Y'])
         d['NUM_ELEM_Z'] = int(d['NUM_ELEM_Z'])
         d['DOF_PN'] = int(d['DOF_PN'])
+
         d['ETA'] = str(d['ETA']).lower()
+
         d['ELEM_TYPE'] = d['ELEM_K']
         d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
@@ -156,23 +163,25 @@ def _parse_dict(d):
 
     # Check for active elements:
     try:
-        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM']) - 1
+        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM'], int) - 1
     except KeyError:
-        d['ACTV_ELEM'] = _tpd2vec('')
+        d['ACTV_ELEM'] = _tpd2vec('', int)
     except AttributeError:
         pass
 
     # Check for passive elements:
     try:
-        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM']) - 1
+        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM'], int) - 1
     except KeyError:
-        d['PASV_ELEM'] = _tpd2vec('')
+        d['PASV_ELEM'] = _tpd2vec('', int)
     except AttributeError:
         pass
 
     # Check if diagonal quadratic approximation is required:
     try:
+
         d['APPROX'] = d['APPROX'].lower()
+
     except KeyError:
         pass
 
@@ -211,13 +220,15 @@ def _parse_dict(d):
     # they are not specified in the ToPy problem definition file:
     Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
     (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint for PySparse
-    d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize) #  Global stiffness matrix
+    d['K'] = sp_sparse.coo_matrix( (Ksize, Ksize) ) #  Global stiffness matrix
+    #print(Ksize)
+    #d['K'] = np.zeros( (Ksize, Ksize) ) #  Global stiffness matrix
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
     d['DOF_PN']) #  Initial element to structure DOF mapping
 
     return d
 
-def _tpd2vec(seq):
+def _tpd2vec(seq, dtype=float):
     """
     Convert a tpd file string to a vector, return a NumPy array.
 
@@ -230,25 +241,28 @@ def _tpd2vec(seq):
         array([], dtype=float64)
 
     """
-    finalvec = np.array([], int)
+    finalvec = []
     for s in seq.split(';'):
         if s.count('|'):
-            values = [int(v) for v in s.split('|')]
+            values = [dtype(v) for v in s.split('|')]
             values[1] += 1
-            vec = np.arange(*values)
+            if len(values) == 2:
+                values.append(1)
+            val = values[0]
+            while val < values[1]:
+                finalvec.append(val)
+                val += values[2]
         elif s.count('@'):
             value, num = s.split('@')
-            try:
-                vec = np.ones(int(num)) * float(value)
-            except ValueError:
-                raise ValueError('%s is incorrectly specified' % seq)
+            num = int(num)
+            for _ in range(num):
+                finalvec.append(dtype(value))
         else:
             try:
-                vec = [float(s)]
+                finalvec.append(dtype(s))
             except ValueError:
-                vec = np.array([])
-        finalvec = np.append(finalvec, vec)
-    return finalvec
+                pass
+    return np.array(finalvec, dtype)
 
 def _dofvec(x, y, z, dofpn):
     """
@@ -345,10 +359,12 @@ def _checkparams(d):
     # Check for rigid body motion and warn user:
     if d['DOF_PN'] == 2:
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d:
-            logger.info('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
+
+            Logger.display('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
     if d['DOF_PN'] == 3:
-        if not d.has_key('FXTR_NODE_X') or not d.has_key('FXTR_NODE_Y')\
-        or not d.has_key('FXTR_NODE_Z'):
-            logger.info('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
+        if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d\
+        or 'FXTR_NODE_Z' not in d:
+            Logger.display('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
+
 
 # EOF parser.py
