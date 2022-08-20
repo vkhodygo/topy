@@ -7,7 +7,6 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-
 import numpy as np
 
 import scipy.sparse as sp_sparse
@@ -16,13 +15,16 @@ import scipy.sparse as sp_sparse
 from .utils import get_logger
 from .elements import *
 
-logger = get_logger(__name__)
+from . import elements, utils
+
+
+logger = utils.get_logger(__name__)
 
 
 # ========================
 # === Public functions ===
 # ========================
-def tpd_file2dict(fname):
+def tpd_file2dict(fname: str) -> dict:
     """
     Read in *all* the parameters from a TPD file and return a dictionary.
 
@@ -44,15 +46,19 @@ def tpd_file2dict(fname):
         >>> tpd_file2dict('2d_beam.tpd')
 
     """
-    with open(fname, 'r') as f:
+    with open(fname, "r") as f:
         s = f.read()
+
     # Check for file version header, and parse:
-    if s.startswith('[ToPy Problem Definition File v2007]') != True:
-        raise Exception('Input file or format not recognised')
-    elif s.startswith('[ToPy Problem Definition File v2007]') == True:
-        d = _parsev2007file(s)
-        logger.info('ToPy problem definition (TPD) file successfully parsed.')
-        logger.info('TPD file name: {} (v2007)\n'.format(fname))
+
+    if not s.startswith("[ToPy Problem Definition File v2007]"):
+        raise Exception("Input file or format not recognised")
+
+    d = _parsev2007file(s)
+    logger.info("ToPy problem definition (TPD) file successfully parsed.")
+    logger.info("TPD file name: {} (v2007)\n".format(fname))
+
+
     # Very basic parameter checking, exit on error:
     _checkparams(d)
     # Future file versions, enter <if> and <elif> as per above and define new
@@ -79,7 +85,6 @@ def config2dict(config):
         >>> config2dict({'some_key': some_value})
 
     """
-
     d = _parse_dict(config)
     # Very basic parameter checking, exit on error:
     _checkparams(d)
@@ -91,14 +96,11 @@ def config2dict(config):
 # === Private functions and helpers ===
 # =====================================
 def _parsev2007file(s):
-    """
-    Parse a version 2007 ToPy problem definition file to a dictionary.
-
-    """
+    """Parse a version 2007 ToPy problem definition file to a dictionary."""
     snew = s.splitlines()[1:]
-    snew = [line.split('#')[0] for line in snew] # Get rid of all comments
-    snew = [line.replace('\t', '') for line in snew]
-    snew = [line.replace(' ', '') for line in snew]
+    snew = [line.split("#")[0] for line in snew]  # Get rid of all comments
+    snew = [line.replace("\t", "") for line in snew]
+    snew = [line.replace(" ", "") for line in snew]
     snew = list(filter(len, snew))
 
     d = dict([line.split(':') for line in snew])
@@ -108,7 +110,7 @@ def _parsev2007file(s):
 
 
 def _parse_dict(d):
-       # Read/convert minimum required input and convert, else exit:
+    # Read/convert minimum required input and convert, else exit:
     d = d.copy()
     try:
 
@@ -127,37 +129,38 @@ def _parse_dict(d):
         d['ELEM_TYPE'] = d['ELEM_K']
         d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
-        raise ValueError('One or more parameters incorrectly specified.')
+        raise ValueError("One or more parameters incorrectly specified.")
+
 
     # Check for number of iterations or change stop value:
     try:
-        d['NUM_ITER'] = int(d['NUM_ITER'])
+        d["NUM_ITER"] = int(d["NUM_ITER"])
     except KeyError:
         try:
-            d['CHG_STOP'] = float(d['CHG_STOP'])
+            d["CHG_STOP"] = float(d["CHG_STOP"])
         except KeyError:
             raise ValueError("Neither NUM_ITER nor CHG_STOP was declared")
 
     # Check for GSF penalty factor:
     try:
-        d['Q_FAC'] = float(d['Q_FAC'])
+        d["Q_FAC"] = float(d["Q_FAC"])
     except KeyError:
         pass
 
     # Check for continuation parameters:
     try:
-        d['P_MAX'] = float(d['P_MAX'])
-        d['P_HOLD'] = int(d['P_HOLD'])
-        d['P_INCR'] = float(d['P_INCR'])
-        d['P_CON'] = float(d['P_CON'])
+        d["P_MAX"] = float(d["P_MAX"])
+        d["P_HOLD"] = int(d["P_HOLD"])
+        d["P_INCR"] = float(d["P_INCR"])
+        d["P_CON"] = float(d["P_CON"])
     except KeyError:
         pass
 
     try:
-        d['Q_MAX'] = float(d['Q_MAX'])
-        d['Q_HOLD'] = int(d['Q_HOLD'])
-        d['Q_INCR'] = float(d['Q_INCR'])
-        d['Q_CON'] = float(d['Q_CON'])
+        d["Q_MAX"] = float(d["Q_MAX"])
+        d["Q_HOLD"] = int(d["Q_HOLD"])
+        d["Q_INCR"] = float(d["Q_INCR"])
+        d["Q_CON"] = float(d["Q_CON"])
     except KeyError:
         pass
 
@@ -188,33 +191,29 @@ def _parse_dict(d):
     # How to do the following compactly (perhaps loop through keys)? Check for
     # keys and create fixed DOF vector, loaded DOF vector and load values
     # vector.
-    dofpn = d['DOF_PN']
+    dofpn = d["DOF_PN"]
 
-    x = d.get('FXTR_NODE_X', '')
-    y = d.get('FXTR_NODE_Y', '')
-    z = d.get('FXTR_NODE_Z', '')
-    d['FIX_DOF'] = _dofvec(x, y, z, dofpn)
 
-    x = d.get('LOAD_NODE_X', '')
-    y = d.get('LOAD_NODE_Y', '')
-    z = d.get('LOAD_NODE_Z', '')
-    d['LOAD_DOF'] = _dofvec(x, y, z, dofpn)
+    x = d.get("LOAD_NODE_X", "")
+    y = d.get("LOAD_NODE_Y", "")
+    z = d.get("LOAD_NODE_Z", "")
+    d["LOAD_DOF"] = _dofvec(x, y, z, dofpn)
 
-    x = d.get('LOAD_VALU_X', '')
-    y = d.get('LOAD_VALU_Y', '')
-    z = d.get('LOAD_VALU_Z', '')
-    d['LOAD_VAL'] = _valvec(x, y, z)
+    x = d.get("LOAD_VALU_X", "")
+    y = d.get("LOAD_VALU_Y", "")
+    z = d.get("LOAD_VALU_Z", "")
+    d["LOAD_VAL"] = _valvec(x, y, z)
 
-    x = d.get('LOAD_NODE_X_OUT', '')
-    y = d.get('LOAD_NODE_Y_OUT', '')
-    z = d.get('LOAD_NODE_Z_OUT', '')
-    d['LOAD_DOF_OUT'] = _dofvec(x, y, z, dofpn)
 
-    x = d.get('LOAD_VALU_X_OUT', '')
-    y = d.get('LOAD_VALU_Y_OUT', '')
-    z = d.get('LOAD_VALU_Z_OUT', '')
-    d['LOAD_VAL_OUT'] = _valvec(x, y, z)
+    x = d.get("LOAD_NODE_X_OUT", "")
+    y = d.get("LOAD_NODE_Y_OUT", "")
+    z = d.get("LOAD_NODE_Z_OUT", "")
+    d["LOAD_DOF_OUT"] = _dofvec(x, y, z, dofpn)
 
+    x = d.get("LOAD_VALU_X_OUT", "")
+    y = d.get("LOAD_VALU_Y_OUT", "")
+    z = d.get("LOAD_VALU_Z_OUT", "")
+    d["LOAD_VAL_OUT"] = _valvec(x, y, z)
 
     # The following entries are created and added to the dictionary,
     # they are not specified in the ToPy problem definition file:
@@ -225,6 +224,12 @@ def _parse_dict(d):
     #d['K'] = np.zeros( (Ksize, Ksize) ) #  Global stiffness matrix
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
     d['DOF_PN']) #  Initial element to structure DOF mapping
+
+    d["K"] = lil_matrix((Ksize, Ksize), dtype=float)  # Global stiffness matrix
+
+    d["E2SDOFMAPI"] = _e2sdofmapinit(
+        d["NUM_ELEM_X"], d["NUM_ELEM_Y"], d["DOF_PN"]
+    )  #  Initial element to structure DOF mapping
 
     return d
 
@@ -264,11 +269,15 @@ def _tpd2vec(seq, dtype=float):
                 pass
     return np.array(finalvec, dtype)
 
+
+
 def _dofvec(x, y, z, dofpn):
     """
     DOF vector.
 
-    """
+
+def _dofvec(x, y, z, dofpn):
+    """DOF vector."""
     try:
         vec_x = _tpd2vec(x)
     except AttributeError:
@@ -292,11 +301,15 @@ def _dofvec(x, y, z, dofpn):
         dofz = (vec_z - 1) * dofpn + 2
     return np.r_[dofx, dofy, dofz].astype(int)
 
+
+
 def _valvec(x, y, z):
     """
     Values (e.g., of loads) vector.
 
-    """
+
+def _valvec(x, y, z):
+    """Values (e.g., of loads) vector."""
     try:
         vec_x = _tpd2vec(x)
     except AttributeError:
@@ -317,6 +330,7 @@ def _valvec(x, y, z):
 
     return np.r_[vec_x, vec_y, vec_z]
 
+
 def _e2sdofmapinit(nelx, nely, dofpn):
     """
     Create the initial element to structure (e2s) DOF mapping (connectivity).
@@ -336,26 +350,32 @@ def _e2sdofmapinit(nelx, nely, dofpn):
         c = np.arange(3 * (nely + 1), 3 * (nely + 1) + 3)
         b = np.arange(3 * (nely + 2), 3 * (nely + 2) + 3)
         h = np.arange(3 * (nelx + 1) * (nely + 1), 3 * (nelx + 1) * (nely + 1) + 3)
-        e = np.arange(3 * ((nelx+1) * (nely+1)+1), 3 * ((nelx+1) * (nely+1)+1) + 3)
-        g = np.arange(3 * ((nelx + 1) * (nely + 1) + (nely + 1)),\
-            3 * ((nelx + 1) * (nely + 1) + (nely + 1)) + 3)
-        f = np.arange(3 * ((nelx + 1) * (nely + 1) + (nely + 2)),\
-            3 * ((nelx + 1) * (nely + 1) + (nely + 2)) + 3)
+        e = np.arange(
+            3 * ((nelx + 1) * (nely + 1) + 1), 3 * ((nelx + 1) * (nely + 1) + 1) + 3
+        )
+        g = np.arange(
+            3 * ((nelx + 1) * (nely + 1) + (nely + 1)),
+            3 * ((nelx + 1) * (nely + 1) + (nely + 1)) + 3,
+        )
+        f = np.arange(
+            3 * ((nelx + 1) * (nely + 1) + (nely + 2)),
+            3 * ((nelx + 1) * (nely + 1) + (nely + 2)) + 3,
+        )
         e2s = np.r_[a, b, c, d, e, f, g, h]
     return e2s
 
 
 def _checkparams(d):
     """
-    Does a few *very basic* checks with regards to the ToPy input parameters.
+    Do a few *very basic* checks with regards to the ToPy input parameters.
     A message will be printed to screen *guessing* a possible problem in
     the input data, if found.
 
     """
-    if d['LOAD_DOF'].size != d['LOAD_VAL'].size:
-        raise ValueError('Load vector and load value vector lengths not equal.')
-    if d['LOAD_VAL'].size + d['LOAD_DOF'].size == 0:
-        raise ValueError('No load(s) or no loaded node(s) specified.')
+    if d["LOAD_DOF"].size != d["LOAD_VAL"].size:
+        raise ValueError("Load vector and load value vector lengths not equal.")
+    if d["LOAD_VAL"].size + d["LOAD_DOF"].size == 0:
+        raise ValueError("No load(s) or no loaded node(s) specified.")
     # Check for rigid body motion and warn user:
     if d['DOF_PN'] == 2:
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d:
