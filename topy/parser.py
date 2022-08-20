@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Parse a ToPy problem definition (TPD) file to a Python dictionary.
 #
@@ -6,20 +7,20 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-
 import numpy as np
-import scipy as sp
 
-from topy import elements
-from topy.utils import get_logger
+from scipy.sparse import lil_matrix
 
-logger = get_logger(__name__)
+from . import elements, utils
+
+
+logger = utils.get_logger(__name__)
 
 
 # ========================
 # === Public functions ===
 # ========================
-def tpd_file2dict(fname):
+def tpd_file2dict(fname: str) -> dict:
     """
     Read in *all* the parameters from a TPD file and return a dictionary.
 
@@ -43,13 +44,17 @@ def tpd_file2dict(fname):
     """
     with open(fname, "r") as f:
         s = f.read()
+
     # Check for file version header, and parse:
-    if s.startswith("[ToPy Problem Definition File v2007]"):
-        d = _parsev2007file(s)
-        logger.info("ToPy problem definition (TPD) file successfully parsed.")
-        logger.info("TPD file name: %s (v2007)\n", fname)
-    else:
-        raise ValueError("Input file or format not recognised")
+
+    if not s.startswith("[ToPy Problem Definition File v2007]"):
+        raise Exception("Input file or format not recognised")
+
+    d = _parsev2007file(s)
+    logger.info("ToPy problem definition (TPD) file successfully parsed.")
+    logger.info("TPD file name: {} (v2007)\n".format(fname))
+
+
     # Very basic parameter checking, exit on error:
     _checkparams(d)
     # Future file versions, enter <if> and <elif> as per above and define new
@@ -113,8 +118,10 @@ def _parse_dict(d):
         d["ETA"] = str(d["ETA"]).lower()
         d["ELEM_TYPE"] = d["ELEM_K"]
         d["ELEM_K"] = getattr(elements, d["ELEM_TYPE"])
-    except (KeyError, TypeError, AttributeError) as e:
-        raise ValueError("One or more parameters incorrectly specified.") from e
+
+    except:
+        raise ValueError("One or more parameters incorrectly specified.")
+
 
     # Check for number of iterations or change stop value:
     try:
@@ -175,10 +182,6 @@ def _parse_dict(d):
     # vector.
     dofpn = d["DOF_PN"]
 
-    x = d.get("FXTR_NODE_X", "")
-    y = d.get("FXTR_NODE_Y", "")
-    z = d.get("FXTR_NODE_Z", "")
-    d["FIX_DOF"] = _dofvec(x, y, z, dofpn)
 
     x = d.get("LOAD_NODE_X", "")
     y = d.get("LOAD_NODE_Y", "")
@@ -189,6 +192,7 @@ def _parse_dict(d):
     y = d.get("LOAD_VALU_Y", "")
     z = d.get("LOAD_VALU_Z", "")
     d["LOAD_VAL"] = _valvec(x, y, z)
+
 
     x = d.get("LOAD_NODE_X_OUT", "")
     y = d.get("LOAD_NODE_Y_OUT", "")
@@ -208,7 +212,9 @@ def _parse_dict(d):
         * (d["NUM_ELEM_Y"] + 1)
         * (d["NUM_ELEM_Z"] + 1)
     )  #  Memory allocation hint for PySparse
-    d["K"] = sp.sparse.lil_matrix((Ksize, Ksize))  #  Global stiffness matrix
+
+    d["K"] = lil_matrix((Ksize, Ksize), dtype=float)  # Global stiffness matrix
+
     d["E2SDOFMAPI"] = _e2sdofmapinit(
         d["NUM_ELEM_X"], d["NUM_ELEM_Y"], d["DOF_PN"]
     )  #  Initial element to structure DOF mapping
@@ -250,6 +256,12 @@ def _tpd2vec(seq):
     return finalvec
 
 
+
+def _dofvec(x, y, z, dofpn):
+    """
+    DOF vector.
+
+
 def _dofvec(x, y, z, dofpn):
     """DOF vector."""
     try:
@@ -274,6 +286,12 @@ def _dofvec(x, y, z, dofpn):
     else:
         dofz = (vec_z - 1) * dofpn + 2
     return np.r_[dofx, dofy, dofz].astype(int)
+
+
+
+def _valvec(x, y, z):
+    """
+    Values (e.g., of loads) vector.
 
 
 def _valvec(x, y, z):

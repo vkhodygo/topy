@@ -1,9 +1,13 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 ToPy install script.
 
 Install ToPy through `pip install .`.
 """
+
+import json
+
 import setuptools
 
 # Get project description.
@@ -21,20 +25,22 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     packages=["topy", "topy.data"],
     install_requires=[
+
+        "typing",
+        "pathlib",
         "matplotlib",
         "sympy",
-        "numpy",
+        "numpy<=1.14",
         "scipy",
-        "scikit-sparse",
+
         "pyvtk",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Development Status :: 3 - Alpha",
     ],
-    python_requires=">=3.8",
-    keywords="topology optimization vtk",
+    python_requires=">=3",
+    **metadata
 )

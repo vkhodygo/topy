@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
 # conditions. Data is read from an input file, see 'examples' directory.
@@ -7,16 +8,18 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-import typing as tp
 
 import numpy as np
-import sksparse as sks  # pylint: disable-msg=import-error
-from scipy.sparse import linalg as sla
-from topy.parser import config2dict, tpd_file2dict
-from topy.utils import get_logger
+from scipy.sparse import lil_matrix
+from scipy.sparse import linalg
 
-logger = get_logger(__name__)
-logger.info("Instantiated.")
+from . import utils
+from .parser import config2dict
+from .parser import tpd_file2dict
+
+logger = utils.get_logger(__name__)
+
+
 __all__ = ["Topology"]
 
 
@@ -26,12 +29,10 @@ SOLID, VOID = 1.000, 0.001  #  Upper and lower bound value for design variables
 KDATUM = 0.1  #  Reference stiffness value of springs for mechanism synthesis
 
 # Constants for exponential approximation:
-A_LOW = -3.0  #  Lower restriction on 'a' for exponential approximation
+
+A_LOW = -3  #  Lower restriction on 'a' for exponential approximation
 A_UPP = -1e-5  #  Upper restriction on 'a' for exponential approximation
 
-# Constants for the PCG algorithm.
-PCG_MAXITER = 8000
-PCG_TOL = 1e-8
 
 
 # =======================
@@ -45,28 +46,32 @@ class Topology:
 
     def __init__(
         self,
-        config: dict = None,
-        topydict: tp.Dict[str, str] = None,
-        pcount: int = 0,
-        qcount: int = 0,
-        itercount: int = 0,
+
+        config=None,
+        topydict=None,
+        pcount=0,
+        qcount=0,
+        itercount=0,
         change=1,
         svtfrac=None,
     ):
+
+        # `{}` is an unsafe default argument.
+        if topydict is None:
+            topydict = {}
+
+
         self.pcount = pcount  #  Counter for continuation of p
         self.qcount = qcount  #  Counter for continuation of q for GSF
         self.itercount = itercount  #  Internal counter
         self.change = change
         self.svtfrac = svtfrac
 
-        #  Store tpd file data in dictionary
-        self.topydict = (
-            config2dict(config.copy())
-            if config
-            else {}
-            if topydict is None
-            else topydict
-        )
+        if config:
+            self.topydict = config2dict(config.copy())
+        else:
+            self.topydict = topydict  #  Store tpd file data in dictionary
+
 
     # ======================
     # === Public methods ===
@@ -141,32 +146,32 @@ class Topology:
         self.K = self.topydict["K"]  #  Global stiffness matrix
         if self.nelz:
             logger.info(
-                "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x NUM_ELEM_Z) = %d x %d x %d",
-                self.nelx,
-                self.nely,
-                self.nelz,
+
+                "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x "
+                + "NUM_ELEM_Z) = %d x %d x %d" % (self.nelx, self.nely, self.nelz)
             )
         else:
             logger.info(
-                "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d",
-                self.nelx,
-                self.nely,
+                "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d"
+                % (self.nelx, self.nely)
             )
 
-        logger.info("Element type (ELEM_K) = %s", self.topydict["ELEM_TYPE"])
-        logger.info("Filter radius (FILT_RAD) = %s", self.filtrad)
+        logger.info("Element type (ELEM_K) = {}".format(self.topydict["ELEM_TYPE"]))
+        logger.info("Filter radius (FILT_RAD) = {}".format(self.filtrad))
+
 
         # Check for either one of the following two, will take NUM_ITER if both
         # are specified.
         try:
             self.numiter = self.topydict["NUM_ITER"]  #  Number of iterations
-            logger.info("Number of iterations (NUM_ITER) = %d", self.numiter)
+
+            logger.info("Number of iterations (NUM_ITER) = %d" % (self.numiter))
         except KeyError:
             self.chgstop = self.topydict["CHG_STOP"]  #  Change stop criteria
             logger.info(
-                "Change stop value (CHG_STOP) = %.3e (%.2f%%)",
-                self.chgstop,
-                self.chgstop * 100,
+                "Change stop value (CHG_STOP) = %.3e (%.2f%%)"
+                % (self.chgstop, self.chgstop * 100)
+
             )
             self.numiter = MAX_ITERS
 
@@ -207,8 +212,10 @@ class Topology:
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
-        logger.info("Problem type (PROB_TYPE) = %s", self.probtype)
-        logger.info("Problem name (PROB_NAME) = %s", self.probname)
+
+        logger.info("Problem type (PROB_TYPE) = " + self.probtype)
+        logger.info("Problem name (PROB_NAME) = " + self.probname)
+
 
         # Set extra parameters if specified:
         # (1) Continuation parameters for 'p':
@@ -236,7 +243,9 @@ class Topology:
             logger.info("Damping factor (ETA) = exp")
         else:
             self.eta = float(self.topydict["ETA"]) * np.ones(self.desvars.shape)
-            logger.info("Damping factor (ETA) = %3.2f", self.eta.mean())
+
+            logger.info("Damping factor (ETA) = %3.2f" % (self.eta.mean()))
+
 
         try:
             self.approx = self.topydict["APPROX"].lower()
@@ -281,11 +290,13 @@ class Topology:
             maskin = np.ones(self.loaddof.shape, dtype="int")
             maskout = np.ones(self.loaddofout.shape, dtype="int")
             if len(ksin) > 1:
-                self.K.update_add_mask_sym([ksin, ksin], self.loaddof, maskin)
-                self.K.update_add_mask_sym([ksout, ksout], self.loaddofout, maskout)
+                utils.update_add_mask_sym(self.K, [ksin, ksin], self.loaddof, maskin)
+                utils.update_add_mask_sym(
+                    self.K, [ksout, ksout], self.loaddofout, maskout
+                )
             else:
-                self.K.update_add_mask_sym([ksin], self.loaddof, maskin)
-                self.K.update_add_mask_sym([ksout], self.loaddofout, maskout)
+                utils.update_add_mask_sym(self.K, [ksin], self.loaddof, maskin)
+                utils.update_add_mask_sym(self.K, [ksout], self.loaddofout, maskout)
 
     def fea(self):
         """
@@ -309,36 +320,41 @@ class Topology:
         Kfree = self._updateK(self.K.copy())
 
         if self.dofpn < 3 and self.nelz == 0:  #  Direct solver
-            Kfree = Kfree.to_csr()  #  Need CSR for SuperLU factorisation
-            lu = sla.splu(Kfree)
-            lu.solve(self.rfree, self.dfree)
-            if self.probtype == "mech":
-                lu.solve(self.rfreeout, self.dfreeout)  # mechanism synthesis
-        else:  #  Iterative solver for 3D problems
-            # 20200313: @mlaradji: refactor-use-scipy - No SSS sparse format in SciPy.
-            #   This originally converted `Kfree` to the SSS format (http://pysparse.sourceforge.net/formats.html#sparse-skyline-format).
-            #   Some log messages were removed here as SciPy may not supply the necassary values.
 
-            # Sparse matrix to factorize should be in CSR or CSC format.
-            Kfree = Kfree.tocsr()
-            preK = sks.cholmod.cholesky(Kfree)  #  Preconditioned Kfree
-            sla.lobpcg(
-                Kfree,
-                X=self.dfree,
-                B=self.rfree,
-                tol=PCG_TOL,
-                maxiter=PCG_MAXITER,
-                K=preK,
+            Kfree = Kfree.tocsr()  #  Need CSR for SuperLU factorisation
+            lu = linalg.splu(Kfree)
+            lu.solve((self.rfree, self.dfree))
+            if self.probtype == "mech":
+                lu.solve((self.rfreeout, self.dfreeout))  # mechanism synthesis
+        else:  #  Iterative solver for 3D problems
+            Kfree = Kfree.to_csr()
+            preK = utils.precondition_sparse_matrix(Kfree)  # Preconditioned Kfree
+            (info, numitr, relerr) = linalg.cg(
+                Kfree, self.rfree, self.dfree, tol=1e-8, maxiter=8000, M=preK
             )
-            if self.probtype == "mech":  # mechanism synthesis
-                sla.lobpcg(
-                    Kfree,
-                    X=self.dfreeout,
-                    B=self.rfreeout,
-                    tol=PCG_TOL,
-                    maxiter=PCG_MAXITER,
-                    K=preK,
+            if info < 0:
+                logger.error(
+                    "PySparse error: Type: {}, " "at {} iterations".format(info, numitr)
                 )
+                raise Exception("Solution for FEA did not converge.")
+            else:
+                logger.debug(
+                    "ToPy: Solution for FEA converged after "
+                    "{} iterations".format(numitr)
+                )
+            if self.probtype == "mech":  # mechanism synthesis
+                (info, numitr, relerr) = linalg.cg(
+                    Kfree, self.rfreeout, self.dfreeout, tol=1e-8, maxiter=8000, M=preK
+                )
+                if info < 0:
+                    logger.error(
+                        "PySparse error: Type: {}, "
+                        "at {} iterations".format(info, numitr)
+                    )
+                    raise Exception(
+                        "Solution for FEA of adjoint load " "case did not converge."
+                    )
+
 
         # Update displacement vectors:
         self.d[self.freedof] = self.dfree
@@ -509,7 +525,7 @@ class Topology:
 
         # Exponential approximation of eta (damping factor):
         if self.itercount > 1:
-            # pylint: disable-msg=access-member-before-definition
+
             if self.topydict["ETA"] == "exp":  #  Check TPD specified value
                 mask = np.equal(self.desvarsold / self.desvars, 1)
                 self.a = (
@@ -654,12 +670,11 @@ class Topology:
     # ===================================
     # === Private methods and helpers ===
     # ===================================
-    def _updateK(self, K):
+    def _updateK(self, K: lil_matrix) -> lil_matrix:
         """
-        Update the global stiffness matrix by looking at each element's
-        contribution i.t.o. design domain density and the penalisation factor.
-        Return unconstrained stiffness matrix.
+        Update the global stiffness matrix by looking at each element's contribution i.t.o. design domain density and the penalisation factor.
 
+        :returns: unconstrained stiffness matrix.
         """
         if self.nelz == 0:  #  2D problem
             for elx in range(self.nelx):
@@ -674,7 +689,9 @@ class Topology:
                             VOID + (1 - VOID) * self.desvars[ely, elx] ** self.p
                         ) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
-                    K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+
+                    utils.update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
         else:  #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
@@ -692,7 +709,7 @@ class Topology:
                                 + (1 - VOID) * self.desvars[elz, ely, elx] ** self.p
                             ) * self.Ke
                         mask = np.ones(e2sdofmap.size, dtype=int)
-                        K.update_add_mask_sym(updatedKe, e2sdofmap, mask)
+                        utils.update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
 
         K.delete_rowcols(self._rcfixed)  #  Del constrained rows and columns
         return K
