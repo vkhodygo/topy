@@ -3,6 +3,7 @@
 import itertools
 import logging
 import sys
+import os
 
 from datashape import dshape
 from scipy.sparse import lil_matrix
@@ -53,3 +54,12 @@ def precondition_sparse_matrix(A: lil_matrix) -> linalg.LinearOperator:
     Mx = ilu.solve
     return linalg.LinearOperator(A.shape, Mx)
 
+
+
+
+def get_data_file(source_file_name):
+    # type: (str) -> (str)
+    """Return the data file path to store result."""
+    path = list(os.path.split(source_file_name))
+    path[-1] = path[-1].split('_')[0] + '.K'
+    return os.path.join(*path)

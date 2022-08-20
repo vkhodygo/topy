@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Finite element stiffness matrices.
 #
@@ -8,6 +9,7 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
+
 from os import path
 
 import numpy as np
@@ -36,47 +38,51 @@ pth = path.join(path.split(__file__)[0], "data")
 # ==============================================
 fname = path.join(pth, "Q4bar.K")
 try:
-    Q4bar = np.load(fname, allow_pickle=True)
-except IOError:
-    logger.info("It seems as though all or some of the element stiffness matrices")
-    logger.info("do not exist. Creating them...")
-    logger.info("This is usually only required once and may take a few minutes.")
-    from topy.data import Q4bar_K  # pylint: disable-msg=unused-import
 
-    Q4bar = np.load(fname, allow_pickle=True)
+    Q4bar = load(fname, allow_pickle=True)
+except (IOError, FileNotFoundError):
+    print('It seems as though all or some of the element stiffness matrices')
+    print('do not exist. Creating them...')
+    print('This is usually only required once and may take a few minutes.')
+    from .data import Q4bar_K
+    Q4bar = load(fname, allow_pickle=True)
+
 
 # ==========================================================================
 # === Stiffness matrix of a square 4 node plane stress bi-linear element ===
 # ==========================================================================
 fname = path.join(pth, "Q4.K")
 try:
-    Q4 = np.load(fname, allow_pickle=True)
+    Q4 = load(fname, allow_pickle=True)
 except IOError:
-    from topy.data import Q4_K  # pylint: disable-msg=unused-import
 
-    Q4 = np.load(fname, allow_pickle=True)
+    from topy.data import Q4_K
+    Q4 = load(fname, allow_pickle=True)
+
 
 # =========================================================================
 # === Stiffness matrix of a square 4 node plane stress '5-beta' element ===
 # =========================================================================
 fname = path.join(pth, "Q5B.K")
 try:
-    Q5B = np.load(fname, allow_pickle=True)
+    Q5B = load(fname, allow_pickle=True)
 except IOError:
-    from topy.data import Q5B_K  # pylint: disable-msg=unused-import
 
-    Q5B = np.load(fname, allow_pickle=True)
+    from topy.data import Q5B_K
+    Q5B = load(fname, allow_pickle=True)
+
 
 # =========================================================
 # === Matrix for an element used in 2D thermal problems ===
 # =========================================================
 fname = path.join(pth, "Q4T.K")
 try:
-    Q4T = np.load(fname, allow_pickle=True)
+    Q4T = load(fname, allow_pickle=True)
 except IOError:
-    from topy.data import Q4T_K  # pylint: disable-msg=unused-import
 
-    Q4T = np.load(fname, allow_pickle=True)
+    from topy.data import Q4T_K
+    Q4T = load(fname, allow_pickle=True)
+
 
 # ===========================================================
 # === Stiffness matrix of a square 4 node 'Q4a5B' element ===
@@ -99,20 +105,23 @@ Q4a5B = Q4 - alpha2D * _E * Q4bar  # stiffness matrix
 # ======================================================================
 fname = path.join(pth, "H8.K")
 try:
-    H8 = np.load(fname, allow_pickle=True)
+    H8 = load(fname, allow_pickle=True)
 except IOError:
-    from topy.data import H8_K  # pylint: disable-msg=unused-import
 
-    H8 = np.load(fname, allow_pickle=True)
+    from topy.data import H8_K
+    H8 = load(fname, allow_pickle=True)
+
 
 # ============================================================
 # === Stiffness matrix of a cubic 8 node '18-beta' element ===
 # ============================================================
 fname = path.join(pth, "H18B.K")
 try:
-    H18B = np.load(fname, allow_pickle=True)
+    H18B = load(fname, allow_pickle=True)
 except IOError:
-    from topy.data import H18B_K  # pylint: disable-msg=unused-import
+
+    from topy.data import H18B_K
+    H18B = load(fname, allow_pickle=True)
 
     H18B = np.load(fname, allow_pickle=True)
 
@@ -122,10 +131,11 @@ except IOError:
 # ==========================================================================
 fname = path.join(pth, "H8T.K")
 try:
-    H8T = np.load(fname, allow_pickle=True)
+    H8T = load(fname, allow_pickle=True)
 except IOError:
-    from topy.data import H8T_K  # pylint: disable-msg=unused-import
 
-    H8T = np.load(fname, allow_pickle=True)
+    from topy.data import H8T_K
+    H8T = load(fname, allow_pickle=True)
+
 
 # EOF elements.py

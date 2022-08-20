@@ -1,12 +1,12 @@
-﻿#!/usr/bin/env python
-## Author: William Hunter
-"""
-Optimze a TPD file from the commandline. See `python scripts/optimize.py --help`.
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 This script handles both number of iterations and change stop criteria runs.
 """
 
 # Import required modules:
+import signal
+from sys import argv
 import topy
 import argparse
 
@@ -19,16 +19,16 @@ parser.add_argument(
 )
 
 
-def optimise(filename, vtk_format="binary"):
-    # type: (str, str) -> None
-    """Optimize the TPD file at `fname`."""
+def optimise(fname, outdir, apikey):
+
     # Set up ToPy:
     t = topy.Topology()
     t.load_tpd_file(filename)
     t.set_top_params()
-    topy.optimise(t)
+    topy.optimise(t, dir=outdir, apikey=apikey)
 
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-    optimise(**args.__dict__)
+if __name__ == '__main__':
+
+    optimise(argv[1], argv[2], argv[3])
+

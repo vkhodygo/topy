@@ -9,6 +9,8 @@
 # =============================================================================
 """
 
+from __future__ import division
+#from string import lower
 import numpy as np
 from scipy.sparse import lil_matrix
 from scipy.sparse import linalg
@@ -17,6 +19,11 @@ from . import utils
 from .parser import config2dict
 from .parser import tpd_file2dict
 
+from .helper_functions import identity_minus_rows, update_add_mask_sym
+
+logger = get_logger(__name__)
+logger.info("Instantiated.")
+__all__ = ['Topology']
 logger = utils.get_logger(__name__)
 
 
@@ -25,6 +32,7 @@ __all__ = ["Topology"]
 
 MAX_ITERS = 250
 
+KDATUM = 0.1 #  Reference stiffness value of springs for mechanism synthesis
 SOLID, VOID = 1.000, 0.001  #  Upper and lower bound value for design variables
 KDATUM = 0.1  #  Reference stiffness value of springs for mechanism synthesis
 
@@ -363,6 +371,72 @@ class Topology:
         # Increment internal iteration counter
         self.itercount += 1
 
+    def sens_analysis(self):
+        """
+        Determine the objective function value and perform sensitivity analysis
+        (find the derivatives of objective function). Return the design
+        sensitivities as a NumPy array.
+
+        EXAMPLES:
+            >>> t.sens_analysis()
+
+        See also: fea
+
+        """
+        if not self.topydict:
+            raise ToPyError('You must first load a TPD file!')
+        tmp = self.df.copy()
+        self.objfval  = 0.0 #  Objective function value
+        if self.nelz == 0: #  2D problem
+            for ely in xrange(self.nely):
+                for elx in xrange(self.nelx):
+                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                (ely + elx * (self.nely + 1))
+                    qe = self.d[e2sdofmap]
+                    qeTKeqe = dot(dot(qe, self.Ke), qe)
+                    if self.probtype == 'comp':
+                        self.objfval += (self.desvars[ely, elx] ** self.p) *\
+                        qeTKeqe
+                        tmp[ely, elx] = - self.p * self.desvars[ely, elx] **\
+                        (self.p - 1) * qeTKeqe
+                    elif self.probtype == 'heat':
+                        self.objfval += (self.void + (1 - self.void) * \
+                        self.desvars[ely, elx] ** self.p) * qeTKeqe
+                        tmp[ely, elx] = - (1 - self.void) * self.p * \
+                        self.desvars[ely, elx] ** (self.p - 1) * qeTKeqe
+                    elif self.probtype == 'mech':
+                        self.objfval = self.d[self.loaddofout]
+                        qeout = self.dout[e2sdofmap]
+                        tmp[ely, elx] = self.p * self.desvars[ely, elx]\
+                        ** (self.p - 1) * dot(dot(qe, self.Ke), qeout)
+        else: #  3D problem
+            for elz in xrange(self.nelz):
+                for ely in xrange(self.nely):
+                    for elx in xrange(self.nelx):
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1) + elz *\
+                                    (self.nelx + 1) * (self.nely + 1))
+                        qe = self.d[e2sdofmap]
+                        qeTKeqe = dot(dot(qe, self.Ke), qe)
+                        if self.probtype == 'comp':
+                            self.objfval += (self.desvars[elz, ely, elx] **\
+                            self.p) * qeTKeqe
+                            tmp[elz, ely, elx] = - self.p * self.desvars[elz, \
+                            ely, elx] ** (self.p - 1) * qeTKeqe
+                        elif self.probtype == 'heat':
+                            self.objfval += (self.void + (1 - self.void) * \
+                            self.desvars[elz, ely, elx] ** self.p) * qeTKeqe
+                            tmp[elz, ely, elx] = - (1 - self.void) *  self.p * \
+                            self.desvars[elz, ely, elx] ** (self.p - 1) * \
+                            qeTKeqe
+                        elif self.probtype == 'mech':
+                            self.objfval = self.d[self.loaddofout].sum()
+                            qeout = self.dout[e2sdofmap]
+                            tmp[elz, ely, elx] = self.p * \
+                            self.desvars[elz, ely, elx] ** (self.p - 1) * \
+                            dot(dot(qe, self.Ke), qeout)
+        self.df = tmp
+
     def filter_sens_sigmund(self):
         """
         Filter the design sensitivities using Sigmund's heuristic approach.
@@ -662,9 +736,9 @@ class Topology:
         # Change in design variables:
         self.change = (np.abs(self.desvars - self.desvarsold)).max()
 
-        # Solid-void fraction:
-        nr_s = self.desvars.flatten().tolist().count(SOLID)
-        nr_v = self.desvars.flatten().tolist().count(VOID)
+        # Solid-self.void fraction:
+        nr_s = self.desvars.flatten().tolist().count(self.solid)
+        nr_v = self.desvars.flatten().tolist().count(self.void)
         self.svtfrac = (nr_s + nr_v) / self.desvars.size
 
     # ===================================
@@ -714,5 +788,16 @@ class Topology:
         K.delete_rowcols(self._rcfixed)  #  Del constrained rows and columns
         return K
 
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## Jacobi-prconditioner:
+class diag_prec:
+      def __init__(self, A):
+          self.shape = A.shape
+          n = self.shape[0]
+          self.dinv = np.empty(n)
+          for i in range(n):
+              self.dinv[i] = 1.0 / A[i,i]
+      def precon(self, x, y):
+          np.multiply(x, self.dinv, y)
 
 # EOF topology.py

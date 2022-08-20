@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Functions in order to visualise 2D and 3D NumPy arrays.
 #
@@ -8,12 +9,15 @@
 """
 from typing import Any
 import os
+
 import sys
 from datetime import datetime
+import struct
 
 from pylab import axis, close, cm, figure, imshow, savefig, title
 import numpy as np
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
+from PIL import Image
 
 
 # Instruct matplotlib to use the 'Agg' if no display was detected, as matplotlib uses a GUI by default.
@@ -77,6 +81,13 @@ def create_2d_imag(x, **kwargs):
     # ==================================
     # === End of Matplotlib commands ===
     # ==================================
+    # ====================================
+    # === Start of Pillow commands ===
+    # ====================================
+    outim = Image.fromarray(uint8(255-255*x/x.max()))  
+    # ==================================
+    # === End of Pillow commands ===
+    # ==================================
 
     # Set the filename component defaults:
     keys = ["dflt_prefix", "dflt_iternum", "dflt_timestamp", "dflt_filetype"]
@@ -131,6 +142,19 @@ def create_3d_geom(x, vtk_format="binary", **kwargs):
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as geometry:
     _write_geom(x, fname, vtk_format=vtk_format)
+
+
+def save_3d_array(x, iternum, **kwargs):
+    with open(os.path.join(kwargs['dir'], "%s_%03d.bin" % (kwargs['prefix'], iternum)), "wb") as f:
+        ds = []
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                for k in range(x.shape[2]):
+                    ds.append(x[i][x.shape[1] - j - 1][k])
+        f.write(struct.pack('qqq', x.shape[2], x.shape[1], x.shape[0]))
+        f.write(struct.pack('qq', len(ds), 1))
+        for i in range(len(ds)):
+            f.write(struct.pack('d', ds[i]))
 
 
 def create_2d_msh(nelx, nely, fname):
@@ -472,3 +496,4 @@ def _fixiternum(s):
 
 
 # EOF visualisation.py
+
