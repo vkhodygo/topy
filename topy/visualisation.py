@@ -13,8 +13,11 @@ import os
 import sys
 from datetime import datetime
 
-from numpy import arange, asarray, hstack
+from pylab import axis, close, cm, figure, imshow, savefig, title
+from numpy import arange, asarray, hstack, uint8 
+
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
+from PIL import Image
 
 # Instruct matplotlib to use the 'Agg' if no display was detected, as matplotlib uses a GUI by default.
 #   From: https://stackoverflow.com/a/8258144/9954163.
@@ -61,14 +64,23 @@ def create_2d_imag(x, **kwargs):
     # === Start of Matplotlib commands ===
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
-    figure() # open a figure
-    if 'title' in kwargs:
-        title(kwargs['title'])
-        imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    axis('off')
+
+    # figure() # open a figure
+    # if kwargs.has_key('title'):
+    #     title(kwargs['title'])
+    #     imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
+    # imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
+    # axis('off')
+
     # ==================================
     # === End of Matplotlib commands ===
+    # ==================================
+    # ====================================
+    # === Start of Pillow commands ===
+    # ====================================
+    outim = Image.fromarray(uint8(255-255*x/x.max()))  
+    # ==================================
+    # === End of Pillow commands ===
     # ==================================
 
     # Set the filename component defaults:
@@ -78,8 +90,9 @@ def create_2d_imag(x, **kwargs):
     # Change the default filename based on keyword arguments, if necessary:
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as image:
-    savefig(fname, bbox_inches='tight')
-    close() # close the figure
+    # savefig(fname, bbox_inches='tight') # for matplotlib 
+    # close() # close the figure # for matplotlib 
+    outim.save(fname) # for Pillow 
 
 def create_3d_geom(x, **kwargs):
     """
@@ -418,3 +431,4 @@ def _fixiternum(s):
     return s
 
 # EOF visualisation.py
+
