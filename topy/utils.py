@@ -8,13 +8,13 @@ from datashape import dshape
 from scipy.sparse import lil_matrix
 from scipy.sparse import linalg
 
-
 def get_logger(name: str) -> logging.Logger:
     """Return a `Logger` instance for `name`."""
     logger = logging.getLogger(name)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     logger.setLevel(logging.DEBUG)
     return logger
+
 
 
 # ===================================
@@ -52,3 +52,4 @@ def precondition_sparse_matrix(A: lil_matrix) -> linalg.LinearOperator:
     ilu = linalg.spilu(A)
     Mx = ilu.solve
     return linalg.LinearOperator(A.shape, Mx)
+

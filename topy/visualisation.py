@@ -6,22 +6,32 @@
 # Copyright (C) 2008, 2015, 2016, 2017 William Hunter.
 # =============================================================================
 """
+from typing import Any
 import os
 import sys
 from datetime import datetime
 
-from numpy import arange, asarray, hstack
+from pylab import axis, close, cm, figure, imshow, savefig, title
+import numpy as np
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
+
 
 # Instruct matplotlib to use the 'Agg' if no display was detected, as matplotlib uses a GUI by default.
 #   From: https://stackoverflow.com/a/8258144/9954163.
 if not os.environ.get("DISPLAY"):
     import matplotlib
-    matplotlib.use('Agg')
-from pylab import axis, close, cm, figure, imshow, savefig, title
 
-__all__ = ['create_2d_imag', 'create_3d_geom', 'node_nums_2d', 'node_nums_3d',
-'create_2d_msh','create_3d_msh']
+    matplotlib.use("Agg")
+
+__all__ = [
+    "create_2d_imag",
+    "create_3d_geom",
+    "node_nums_2d",
+    "node_nums_3d",
+    "create_2d_msh",
+    "create_3d_msh",
+]
+
 
 def create_2d_imag(x, **kwargs):
     """
@@ -58,27 +68,29 @@ def create_2d_imag(x, **kwargs):
     # === Start of Matplotlib commands ===
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
-    figure() # open a figure
-    if kwargs.has_key('title'):
-        title(kwargs['title'])
-        imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
-    axis('off')
+    figure()  # open a figure
+    if "title" in kwargs:
+        title(kwargs["title"])
+        imshow(-x, cmap=cm.gray, aspect="equal", interpolation="nearest")
+    imshow(-x, cmap=cm.gray, aspect="equal", interpolation="nearest")
+    axis("off")
     # ==================================
     # === End of Matplotlib commands ===
     # ==================================
 
     # Set the filename component defaults:
-    keys = ['dflt_prefix', 'dflt_iternum', 'dflt_timestamp', 'dflt_filetype']
-    values = ['topy_2d', 'nin', '_' + _timestamp(), 'png']
+    keys = ["dflt_prefix", "dflt_iternum", "dflt_timestamp", "dflt_filetype"]
+    values = ["topy_2d", "nin", "_" + _timestamp(), "png"]
     fname_dict = dict(list(zip(keys, values)))
     # Change the default filename based on keyword arguments, if necessary:
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as image:
-    savefig(fname, bbox_inches='tight')
-    close() # close the figure
+    savefig(fname, bbox_inches="tight")
+    close()  # close the figure
 
-def create_3d_geom(x, **kwargs):
+
+def create_3d_geom(x, vtk_format="binary", **kwargs):
+    # type: (np.ndarray, str, **Any) -> None
     """
     Create 3D geometry from a 3D NumPy array.
 
@@ -93,6 +105,7 @@ def create_3d_geom(x, **kwargs):
 
     INPUTS:
         x -- K-by-M-by-N array (depth x rows x columns)
+        legacy_format -- Sets the format for the PyVTK output. One of "binary" or "ascii".
 
     OUTPUTS:
         <filename>.<type>
@@ -111,13 +124,14 @@ def create_3d_geom(x, **kwargs):
 
     """
     # Set the filename component defaults:
-    keys = ['dflt_prefix', 'dflt_iternum', 'dflt_timestamp', 'dflt_filetype']
-    values = ['topy_3d', 'nin', '_' + _timestamp(), 'vtk']
+    keys = ["dflt_prefix", "dflt_iternum", "dflt_timestamp", "dflt_filetype"]
+    values = ["topy_3d", "nin", "_" + _timestamp(), "vtk"]
     fname_dict = dict(list(zip(keys, values)))
     # Change the default filename based on keyword arguments, if necessary:
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as geometry:
-    _write_geom(x, fname)
+    _write_geom(x, fname, vtk_format=vtk_format)
+
 
 def create_2d_msh(nelx, nely, fname):
     """
@@ -137,41 +151,55 @@ def create_2d_msh(nelx, nely, fname):
 
     """
     # Gmsh strings for MSH file
-    MSH_header = '$MeshFormat\n2.2 0 8\n$EndMeshFormat\n'
-    MSH_nodes = ['$Nodes\n', '$EndNodes\n']
-    MSH_elements = ['$Elements\n', '$EndElements\n']
+    MSH_header = "$MeshFormat\n2.2 0 8\n$EndMeshFormat\n"
+    MSH_nodes = ["$Nodes\n", "$EndNodes\n"]
+    MSH_elements = ["$Elements\n", "$EndElements\n"]
 
     # Total number of nodes in mesh
     nnodes = (nelx + 1) * (nely + 1)
     # x and y coordinates of elements
-    xcoords = arange(nelx + 1)
-    ycoords = - arange(nely + 1)
+
+    xcoords = np.arange(nelx + 1)
+    ycoords = - np.arange(nely + 1)
+
     # Total number of elements
     nelms = nelx * nely
 
     # Open, write and close the MSH file
-    with open(fname + '.msh', 'w') as outputfile:
+    with open(fname + ".msh", "w") as outputfile:
         # MSH header
         outputfile.write(MSH_header)
         # MSH nodes
         outputfile.write(MSH_nodes[0])
-        outputfile.write(str(nnodes)+'\n')
+        outputfile.write(str(nnodes) + "\n")
         nodenum = 1
         for x in xcoords:
             for y in ycoords:
                 outputfile.write(str(nodenum))
-                outputfile.write(' ' + str(x) + ' ' + str(y) + ' 0' + '\n')
+                outputfile.write(" " + str(x) + " " + str(y) + " 0" + "\n")
                 nodenum = nodenum + 1
         outputfile.write(MSH_nodes[1])
         # MSH elements
         outputfile.write(MSH_elements[0])
-        outputfile.write(str(nelms)+'\n')
+        outputfile.write(str(nelms) + "\n")
         # elm-number elm-type number-of-tags < tag > ... node-number-list
-        for elem in arange(1, nelms + 1):
+
+        for elem in np.arange(1, nelms + 1):
             outputfile.write(str(elem) + ' 3 0 ') # 3 is a 4-node quadrangle
+
             nn = node_nums_2d(nelx, nely, elem)
-            outputfile.write(str(nn[0]) + ' ' + str(nn[1]) + ' ' + str(nn[3]) + ' ' + str(nn[2]) + '\n')
+            outputfile.write(
+                str(nn[0])
+                + " "
+                + str(nn[1])
+                + " "
+                + str(nn[3])
+                + " "
+                + str(nn[2])
+                + "\n"
+            )
         outputfile.write(MSH_elements[1])
+
 
 def create_3d_msh(nelx, nely, nelz, fname):
     """
@@ -192,44 +220,65 @@ def create_3d_msh(nelx, nely, nelz, fname):
 
     """
     # Gmsh strings for MSH file
-    MSH_header = '$MeshFormat\n2.2 0 8\n$EndMeshFormat\n'
-    MSH_nodes = ['$Nodes\n', '$EndNodes\n']
-    MSH_elements = ['$Elements\n', '$EndElements\n']
+    MSH_header = "$MeshFormat\n2.2 0 8\n$EndMeshFormat\n"
+    MSH_nodes = ["$Nodes\n", "$EndNodes\n"]
+    MSH_elements = ["$Elements\n", "$EndElements\n"]
 
     # Total number of nodes in mesh
     nnodes = (nelx + 1) * (nely + 1) * (nelz + 1)
     # x, y and z coordinates of elements
-    xcoords = arange(nelx + 1)
-    ycoords = - arange(nely + 1)
-    zcoords = arange(nelz + 1)
+
+    xcoords = np.arange(nelx + 1)
+    ycoords = - np.arange(nely + 1)
+    zcoords = np.arange(nelz + 1)
+
     # Total number of elements
     nelms = nelx * nely * nelz
 
     # Open, write and close the MSH file
-    with open(fname + '.msh', 'w') as outputfile:
+    with open(fname + ".msh", "w") as outputfile:
         # MSH header
         outputfile.write(MSH_header)
         # MSH nodes
         outputfile.write(MSH_nodes[0])
-        outputfile.write(str(nnodes) + '\n')
+        outputfile.write(str(nnodes) + "\n")
         nodenum = 1
         for z in zcoords:
             for x in xcoords:
                 for y in ycoords:
                     outputfile.write(str(nodenum))
-                    outputfile.write(' ' + str(x) + ' ' + str(y) + ' ' + str(z) + '\n')
+                    outputfile.write(" " + str(x) + " " + str(y) + " " + str(z) + "\n")
                     nodenum = nodenum + 1
         outputfile.write(MSH_nodes[1])
         # MSH elements
         outputfile.write(MSH_elements[0])
-        outputfile.write(str(nelms)+'\n')
+        outputfile.write(str(nelms) + "\n")
         # elm-number elm-type number-of-tags < tag > ... node-number-list
-        for elem in arange(1, nelms + 1):
+
+        for elem in np.arange(1, nelms + 1):
             outputfile.write(str(elem) + ' 5 0 ') # 5 is a 8-node hexahedron
+
             nn = node_nums_3d(nelx, nely, nelz, elem)
-            outputfile.write(str(nn[0]) + ' ' + str(nn[1]) + ' ' + str(nn[3]) + ' ' + str(nn[2]) + ' ' + \
-                             str(nn[4]) + ' ' + str(nn[5]) + ' ' + str(nn[7]) + ' ' + str(nn[6]) + '\n')
+            outputfile.write(
+                str(nn[0])
+                + " "
+                + str(nn[1])
+                + " "
+                + str(nn[3])
+                + " "
+                + str(nn[2])
+                + " "
+                + str(nn[4])
+                + " "
+                + str(nn[5])
+                + " "
+                + str(nn[7])
+                + " "
+                + str(nn[6])
+                + "\n"
+            )
         outputfile.write(MSH_elements[1])
+
 
 def node_nums_2d(nelx, nely, en):
     """
@@ -255,10 +304,13 @@ def node_nums_2d(nelx, nely, en):
 
     """
     if en > nelx * nely:
+
         raise Exception('Mesh does not contain specified element number.')
-    inn = asarray([0, 1, nely + 1, nely + 2]) #  initial node numbers
+    inn = np.asarray([0, 1, nely + 1, nely + 2]) #  initial node numbers
     nn = inn + (en + (en - 1) // nely) #  the element's node numbers
+
     return nn
+
 
 def node_nums_3d(nelx, nely, nelz, en):
     """
@@ -285,71 +337,84 @@ def node_nums_3d(nelx, nely, nelz, en):
         array([26, 27, 30, 31, 46, 47, 50, 51])
         >>> node_nums_3d(2,1,1,2)
         array([ 3,  4,  5,  6,  9, 10, 11, 12])
+
     """
     xygridsize = nelx * nely
     if en > nelx * nely * nelz:
-        raise Exception('Mesh does not contain specified element number.')
-    pen = en % (xygridsize) #  projected element number on rearmost face
+        raise Exception("Mesh does not contain specified element number.")
+    pen = en % (xygridsize)  #  projected element number on rearmost face
     if pen == 0:
         pen = xygridsize
 
-    nnzero = node_nums_2d(nelx, nely, pen) #  node numbers at rearmost face
+    nnzero = node_nums_2d(nelx, nely, pen)  #  node numbers at rearmost face
     zinc = (en - 1) // xygridsize * (nelx + 1) * (nely + 1)
     nnr = nnzero + zinc
     nnf = nnr + (nelx + 1) * (nely + 1)
-    nn = hstack( (nnr, nnf) )
+
+    nn = np.hstack( (nnr, nnf) )
+
     return nn
+
 
 # =====================================
 # === Private functions and helpers ===
 # =====================================
 def _change_fname(fd, kwargs):
     # Default file name:
-    filename = fd['dflt_prefix'] + '_' + fd['dflt_iternum'] + \
-    fd['dflt_timestamp'] + '.' + fd['dflt_filetype']
+    filename = (
+        fd["dflt_prefix"]
+        + "_"
+        + fd["dflt_iternum"]
+        + fd["dflt_timestamp"]
+        + "."
+        + fd["dflt_filetype"]
+    )
 
     # This is not pretty but it works...
-    if 'prefix' in kwargs:
-        filename = filename.replace(fd['dflt_prefix'], kwargs['prefix'])
-    if 'iternum' in kwargs:
-        fixed_iternum = _fixiternum(str(kwargs['iternum']))
-        filename = filename.replace(fd['dflt_iternum'], fixed_iternum)
-    if 'filetype' in kwargs:
-        ftype = kwargs['filetype']
-        filename = filename.replace(fd['dflt_filetype'], ftype)
-    if 'time' in kwargs:
-        filename = filename.replace(fd['dflt_timestamp'], '')
-    if 'dir' in kwargs:
-        dir = kwargs['dir']
-        if not  dir[-1] == '/':
-            dir = dir + '/'
-        filename = dir + filename
+    if "prefix" in kwargs:
+        filename = filename.replace(fd["dflt_prefix"], kwargs["prefix"])
+    if "iternum" in kwargs:
+        fixed_iternum = _fixiternum(str(kwargs["iternum"]))
+        filename = filename.replace(fd["dflt_iternum"], fixed_iternum)
+    if "filetype" in kwargs:
+        ftype = kwargs["filetype"]
+        filename = filename.replace(fd["dflt_filetype"], ftype)
+    if "time" in kwargs:
+        filename = filename.replace(fd["dflt_timestamp"], "")
+    if "dir" in kwargs:
+        directory = kwargs["dir"]
+        if not directory[-1] == "/":
+            directory = directory + "/"
+        filename = directory + filename
 
     return filename
 
-def _write_geom(x, fname):
-    '''
-    Determines what geometry format (file type) to create.
-    '''
+
+def _write_geom(x, fname, vtk_format="binary"):
+    # type: (np.ndarray, str, str) -> None
+    """Determine what geometry format (file type) to create."""
     if fname.endswith('vtk', -3):
-        _write_legacy_vtu(x, fname)
+        _write_legacy_vtu(x, fname, vtk_format="binary")
+
     else:
-        print('Other file formats not implemented, only legacy VTK.')
-        #_write_vrml2(x, fname) # future
+        print("Other file formats not implemented, only legacy VTK.")
+        # _write_vrml2(x, fname) # future
 
-def _write_legacy_vtu(x, fname):
-    """
-    Write a legacy VTK unstructured grid file.
 
-    """
+def _write_legacy_vtu(x, fname, vtk_format="binary"):
+    # type: (np.ndarray, str, str) -> None
+
+    """Write a legacy VTK unstructured grid file."""
     # Lower bound value used for pixel/voxel culling, any value below this
     # value won't be plotted. Should be same as VOID's value in 'topology.py'.
     THRESHOLD = 0.001
 
     # Voxel local points relative to its centre of geometry:
-    voxel_local_points = asarray([[-1,-1,-1],[ 1,-1,-1],[-1, 1,-1],[ 1, 1,-1],
+
+    voxel_local_points = np.asarray([[-1,-1,-1],[ 1,-1,-1],[-1, 1,-1],[ 1, 1,-1],
                                 [-1,-1, 1],[ 1,-1, 1],[-1, 1, 1],[ 1, 1, 1]])\
                                   * 0.5 # scaling
+
     # Voxel world points:
     points = []
     # Culled input array -- as list:
@@ -358,16 +423,16 @@ def _write_legacy_vtu(x, fname):
     try:
         depth, rows, columns = x.shape
     except ValueError:
-        sys.exit('Array dimensions not equal to 3, possibly 2-dimensional.\n')
+        sys.exit("Array dimensions not equal to 3, possibly 2-dimensional.\n")
 
-    for i in xrange(depth):
-        for j in xrange(rows):
-            for k in xrange(columns):
-                if x[i,j,k] > THRESHOLD:
-                    xculled.append(x[i,j,k])
-                    points += (voxel_local_points + [i,j,k]).tolist()
+    for i in range(depth):
+        for j in range(rows):
+            for k in range(columns):
+                if x[i, j, k] > THRESHOLD:
+                    xculled.append(x[i, j, k])
+                    points += (voxel_local_points + [i, j, k]).tolist()
 
-    voxels = arange(len(points)).reshape(len(xculled), 8).tolist()
+    voxels = np.arange(len(points)).reshape(len(xculled), 8).tolist()
     topology = UnstructuredGrid(points, voxel = voxels)
     file_header = \
     'ToPy data, created '\
@@ -375,41 +440,35 @@ def _write_legacy_vtu(x, fname):
     scalars = CellData(Scalars(xculled, name='Densities', lookup_table =\
     'default'))
     vtk = VtkData(topology, file_header, scalars)
-    vtk.tofile(fname, 'binary')
+    vtk.tofile(fname, format=vtk_format)
+
 
 def _timestamp():
-    """
-    Create and return a timestamp string.
-
-    """
+    """Create and return a timestamp string."""
     now = datetime.now()
     day = _fixstring(str(now.day))
     month = _fixstring(str(now.month))
     year = str(now.year)
     hour = _fixstring(str(now.hour))
     minute = _fixstring(str(now.minute))
-    ts = day + '-' + month + '-' + year + '-' + hour + 'h' + minute
+    ts = day + "-" + month + "-" + year + "-" + hour + "h" + minute
     return ts
 
-def _fixstring(s):
-    """
-    Fix the string by adding a zero in front if single digit number.
 
-    """
+def _fixstring(s):
+    """Fix the string by adding a zero in front if single digit number."""
     if len(s) == 1:
-        s = '0' + s
+        s = "0" + s
     return s
+
 
 def _fixiternum(s):
-    """
-    Fix the string by adding a zero in front if double digit number, and two
-    zeros if single digit number.
-
-    """
+    """Fix the string by adding a zero in front if double digit number, and two zeros if single digit number."""
     if len(s) == 2:
-        s = '0' + s
+        s = "0" + s
     elif len(s) == 1:
-        s = '00' + s
+        s = "00" + s
     return s
+
 
 # EOF visualisation.py

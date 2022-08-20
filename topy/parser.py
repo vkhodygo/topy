@@ -8,9 +8,11 @@
 # =============================================================================
 """
 import numpy as np
+
 from scipy.sparse import lil_matrix
 
 from . import elements, utils
+
 
 logger = utils.get_logger(__name__)
 
@@ -44,12 +46,14 @@ def tpd_file2dict(fname: str) -> dict:
         s = f.read()
 
     # Check for file version header, and parse:
+
     if not s.startswith("[ToPy Problem Definition File v2007]"):
         raise Exception("Input file or format not recognised")
 
     d = _parsev2007file(s)
     logger.info("ToPy problem definition (TPD) file successfully parsed.")
     logger.info("TPD file name: {} (v2007)\n".format(fname))
+
 
     # Very basic parameter checking, exit on error:
     _checkparams(d)
@@ -77,7 +81,6 @@ def config2dict(config):
         >>> config2dict({'some_key': some_value})
 
     """
-
     d = _parse_dict(config)
     # Very basic parameter checking, exit on error:
     _checkparams(d)
@@ -89,10 +92,7 @@ def config2dict(config):
 # === Private functions and helpers ===
 # =====================================
 def _parsev2007file(s):
-    """
-    Parse a version 2007 ToPy problem definition file to a dictionary.
-
-    """
+    """Parse a version 2007 ToPy problem definition file to a dictionary."""
     snew = s.splitlines()[1:]
     snew = [line.split("#")[0] for line in snew]  # Get rid of all comments
     snew = [line.replace("\t", "") for line in snew]
@@ -118,8 +118,10 @@ def _parse_dict(d):
         d["ETA"] = str(d["ETA"]).lower()
         d["ELEM_TYPE"] = d["ELEM_K"]
         d["ELEM_K"] = getattr(elements, d["ELEM_TYPE"])
+
     except:
         raise ValueError("One or more parameters incorrectly specified.")
+
 
     # Check for number of iterations or change stop value:
     try:
@@ -180,6 +182,7 @@ def _parse_dict(d):
     # vector.
     dofpn = d["DOF_PN"]
 
+
     x = d.get("LOAD_NODE_X", "")
     y = d.get("LOAD_NODE_Y", "")
     z = d.get("LOAD_NODE_Z", "")
@@ -189,6 +192,7 @@ def _parse_dict(d):
     y = d.get("LOAD_VALU_Y", "")
     z = d.get("LOAD_VALU_Z", "")
     d["LOAD_VAL"] = _valvec(x, y, z)
+
 
     x = d.get("LOAD_NODE_X_OUT", "")
     y = d.get("LOAD_NODE_Y_OUT", "")
@@ -208,7 +212,9 @@ def _parse_dict(d):
         * (d["NUM_ELEM_Y"] + 1)
         * (d["NUM_ELEM_Z"] + 1)
     )  #  Memory allocation hint for PySparse
+
     d["K"] = lil_matrix((Ksize, Ksize), dtype=float)  # Global stiffness matrix
+
     d["E2SDOFMAPI"] = _e2sdofmapinit(
         d["NUM_ELEM_X"], d["NUM_ELEM_Y"], d["DOF_PN"]
     )  #  Initial element to structure DOF mapping
@@ -250,11 +256,14 @@ def _tpd2vec(seq):
     return finalvec
 
 
+
 def _dofvec(x, y, z, dofpn):
     """
     DOF vector.
 
-    """
+
+def _dofvec(x, y, z, dofpn):
+    """DOF vector."""
     try:
         vec_x = _tpd2vec(x)
     except AttributeError:
@@ -279,11 +288,14 @@ def _dofvec(x, y, z, dofpn):
     return np.r_[dofx, dofy, dofz].astype(int)
 
 
+
 def _valvec(x, y, z):
     """
     Values (e.g., of loads) vector.
 
-    """
+
+def _valvec(x, y, z):
+    """Values (e.g., of loads) vector."""
     try:
         vec_x = _tpd2vec(x)
     except AttributeError:
@@ -341,7 +353,7 @@ def _e2sdofmapinit(nelx, nely, dofpn):
 
 def _checkparams(d):
     """
-    Does a few *very basic* checks with regards to the ToPy input parameters.
+    Do a few *very basic* checks with regards to the ToPy input parameters.
     A message will be printed to screen *guessing* a possible problem in
     the input data, if found.
 

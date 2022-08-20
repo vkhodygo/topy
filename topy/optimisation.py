@@ -16,6 +16,7 @@ __all__ = ["optimise"]
 
 def optimise(topology, save=True, dir="./iterations"):
     # type: (Topology, bool, str) -> None
+
     if not path.exists(dir):
         makedirs(dir)
     etas_avg = []
@@ -29,10 +30,12 @@ def optimise(topology, save=True, dir="./iterations"):
         # Below this line we print info and create images or geometry:
         if t.nelz:
             params = {
+
                 "prefix": t.probname,
                 "iternum": t.itercount,
                 "time": "none",
                 "dir": dir,
+
             }
             if save:
                 create_3d_geom(t.desvars, **params)

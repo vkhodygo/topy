@@ -8,6 +8,7 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
+
 import numpy as np
 from scipy.sparse import lil_matrix
 from scipy.sparse import linalg
@@ -18,6 +19,7 @@ from .parser import tpd_file2dict
 
 logger = utils.get_logger(__name__)
 
+
 __all__ = ["Topology"]
 
 
@@ -27,8 +29,10 @@ SOLID, VOID = 1.000, 0.001  #  Upper and lower bound value for design variables
 KDATUM = 0.1  #  Reference stiffness value of springs for mechanism synthesis
 
 # Constants for exponential approximation:
+
 A_LOW = -3  #  Lower restriction on 'a' for exponential approximation
 A_UPP = -1e-5  #  Upper restriction on 'a' for exponential approximation
+
 
 
 # =======================
@@ -38,11 +42,11 @@ class Topology:
     """
     A class to optimise the topology of a design domain for defined boundary
     values. Data is read from an input file (see 'examples' folder).
-
     """
 
     def __init__(
         self,
+
         config=None,
         topydict=None,
         pcount=0,
@@ -56,6 +60,7 @@ class Topology:
         if topydict is None:
             topydict = {}
 
+
         self.pcount = pcount  #  Counter for continuation of p
         self.qcount = qcount  #  Counter for continuation of q for GSF
         self.itercount = itercount  #  Internal counter
@@ -67,10 +72,11 @@ class Topology:
         else:
             self.topydict = topydict  #  Store tpd file data in dictionary
 
+
     # ======================
     # === Public methods ===
     # ======================
-    def load_tpd_file(self, fname):
+    def load_tpd_file(self, fname: str):
         """
         Load a ToPy problem definition (TPD) file, return a dictionary:
 
@@ -140,6 +146,7 @@ class Topology:
         self.K = self.topydict["K"]  #  Global stiffness matrix
         if self.nelz:
             logger.info(
+
                 "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x "
                 + "NUM_ELEM_Z) = %d x %d x %d" % (self.nelx, self.nely, self.nelz)
             )
@@ -152,16 +159,19 @@ class Topology:
         logger.info("Element type (ELEM_K) = {}".format(self.topydict["ELEM_TYPE"]))
         logger.info("Filter radius (FILT_RAD) = {}".format(self.filtrad))
 
+
         # Check for either one of the following two, will take NUM_ITER if both
         # are specified.
         try:
             self.numiter = self.topydict["NUM_ITER"]  #  Number of iterations
+
             logger.info("Number of iterations (NUM_ITER) = %d" % (self.numiter))
         except KeyError:
             self.chgstop = self.topydict["CHG_STOP"]  #  Change stop criteria
             logger.info(
                 "Change stop value (CHG_STOP) = %.3e (%.2f%%)"
                 % (self.chgstop, self.chgstop * 100)
+
             )
             self.numiter = MAX_ITERS
 
@@ -202,8 +212,10 @@ class Topology:
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
+
         logger.info("Problem type (PROB_TYPE) = " + self.probtype)
         logger.info("Problem name (PROB_NAME) = " + self.probname)
+
 
         # Set extra parameters if specified:
         # (1) Continuation parameters for 'p':
@@ -231,7 +243,9 @@ class Topology:
             logger.info("Damping factor (ETA) = exp")
         else:
             self.eta = float(self.topydict["ETA"]) * np.ones(self.desvars.shape)
+
             logger.info("Damping factor (ETA) = %3.2f" % (self.eta.mean()))
+
 
         try:
             self.approx = self.topydict["APPROX"].lower()
@@ -286,7 +300,7 @@ class Topology:
 
     def fea(self):
         """
-        Performs a Finite Element Analysis given the updated global stiffness
+        Perform a Finite Element Analysis given the updated global stiffness
         matrix [K] and the load vector {r}, both of which must be in the
         modified state, i.e., [K] and {r} must represent the unconstrained
         system of equations. Return the global displacement vector {d} as a
@@ -306,6 +320,7 @@ class Topology:
         Kfree = self._updateK(self.K.copy())
 
         if self.dofpn < 3 and self.nelz == 0:  #  Direct solver
+
             Kfree = Kfree.tocsr()  #  Need CSR for SuperLU factorisation
             lu = linalg.splu(Kfree)
             lu.solve((self.rfree, self.dfree))
@@ -339,6 +354,7 @@ class Topology:
                     raise Exception(
                         "Solution for FEA of adjoint load " "case did not converge."
                     )
+
 
         # Update displacement vectors:
         self.d[self.freedof] = self.dfree
@@ -509,6 +525,7 @@ class Topology:
 
         # Exponential approximation of eta (damping factor):
         if self.itercount > 1:
+
             if self.topydict["ETA"] == "exp":  #  Check TPD specified value
                 mask = np.equal(self.desvarsold / self.desvars, 1)
                 self.a = (
@@ -528,7 +545,7 @@ class Topology:
             move = 0.1
         else:
             move = 0.2
-        lam1, lam2 = 0, 100e3
+        lam1, lam2 = 0.0, 100e3
         dims = self.desvars.shape
         while (lam2 - lam1) / (lam2 + lam1) > 1e-8 and lam2 > 1e-40:
             lammid = 0.5 * (lam1 + lam2)
@@ -672,7 +689,9 @@ class Topology:
                             VOID + (1 - VOID) * self.desvars[ely, elx] ** self.p
                         ) * self.Ke
                     mask = np.ones(e2sdofmap.size, dtype=int)
+
                     utils.update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+
         else:  #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):

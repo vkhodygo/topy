@@ -1,9 +1,12 @@
+
 name: topy.dev
+
 channels:
   - conda-forge
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
+
   - _openmp_mutex=4.5=0_gnu
   - appdirs=1.4.3=py_1
   - astroid=2.3.3=py36_1
@@ -44,10 +47,12 @@ dependencies:
   - libxml2=2.9.9=hea5a465_1
   - matplotlib=3.1.1=py36h5429711_0
   - mccabe=0.6.1=py_1
+
   - more-itertools=8.2.0=py_0
   - mpc=1.1.0=h04dde30_1006
   - mpfr=4.0.2=he80fd80_0
   - mpmath=1.1.0=py_0
+
   - mypy=0.761=py_0
   - mypy_extensions=0.4.3=py36_0
   - ncurses=6.1=hf484d3e_1002
@@ -95,3 +100,4 @@ dependencies:
   - xz=5.2.4=h14c3975_1001
   - zipp=3.0.0=py_0
   - zlib=1.2.11=h516909a_1006
+

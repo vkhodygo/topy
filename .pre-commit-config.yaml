@@ -6,7 +6,9 @@ repos:
         args: ["--maxkb=1024"]
       - id: check-ast
       - id: check-builtin-literals
+
       - id: check-byte-order-marker
+
       - id: check-docstring-first
       - id: check-executables-have-shebangs
       - id: check-json
@@ -19,6 +21,7 @@ repos:
       - id: debug-statements
       - id: detect-private-key
       - id: end-of-file-fixer
+
       - id: fix-encoding-pragma
       - id: name-tests-test
       - id: pretty-format-json
@@ -26,14 +29,17 @@ repos:
       - id: requirements-txt-fixer
       - id: sort-simple-yaml
       - id: trailing-whitespace
+
   - repo: https://github.com/prettier/prettier
     rev: master
     hooks:
       - id: prettier
+
   - repo: https://github.com/asottile/reorder_python_imports
     rev: master
     hooks:
       - id: reorder-python-imports
+
   - repo: https://github.com/ambv/black
     rev: stable
     hooks:
@@ -63,3 +69,4 @@ repos:
             --disallow-incomplete-defs,
             --disallow-untyped-decorators,
           ]
+
