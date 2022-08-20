@@ -8,14 +8,15 @@
 # =============================================================================
 """
 
-#from string import lower
 import numpy as np
 
 import scipy.sparse as sp_sparse
 #from pysparse import spmatrix
 
+from .utils import get_logger
 from .elements import *
-from .topy_logging import Logger
+
+logger = get_logger(__name__)
 
 
 # ========================
@@ -50,9 +51,8 @@ def tpd_file2dict(fname):
         raise Exception('Input file or format not recognised')
     elif s.startswith('[ToPy Problem Definition File v2007]') == True:
         d = _parsev2007file(s)
-        Logger.thick_line()
-        Logger.display('ToPy problem definition (TPD) file successfully parsed.')
-        Logger.display("TPD file name:", fname, "(v2007)")
+        logger.info('ToPy problem definition (TPD) file successfully parsed.')
+        logger.info('TPD file name: {} (v2007)\n'.format(fname))
     # Very basic parameter checking, exit on error:
     _checkparams(d)
     # Future file versions, enter <if> and <elif> as per above and define new
@@ -81,7 +81,6 @@ def config2dict(config):
     """
 
     d = _parse_dict(config)
-    Logger.thick_line()
     # Very basic parameter checking, exit on error:
     _checkparams(d)
     # See method below...
@@ -100,7 +99,7 @@ def _parsev2007file(s):
     snew = [line.split('#')[0] for line in snew] # Get rid of all comments
     snew = [line.replace('\t', '') for line in snew]
     snew = [line.replace(' ', '') for line in snew]
-    snew = filter(len, snew)
+    snew = list(filter(len, snew))
 
     d = dict([line.split(':') for line in snew])
     return _parse_dict(d)
@@ -112,7 +111,9 @@ def _parse_dict(d):
        # Read/convert minimum required input and convert, else exit:
     d = d.copy()
     try:
-        d['PROB_TYPE'] = str.lower(d['PROB_TYPE'])
+
+        d['PROB_TYPE'] = d['PROB_TYPE'].lower()
+
         d['VOL_FRAC'] = float(d['VOL_FRAC'])
         d['FILT_RAD'] = float(d['FILT_RAD'])
         d['P_FAC'] = float(d['P_FAC'])
@@ -120,7 +121,9 @@ def _parse_dict(d):
         d['NUM_ELEM_Y'] = int(d['NUM_ELEM_Y'])
         d['NUM_ELEM_Z'] = int(d['NUM_ELEM_Z'])
         d['DOF_PN'] = int(d['DOF_PN'])
-        d['ETA'] = str.lower(str(d['ETA']))
+
+        d['ETA'] = str(d['ETA']).lower()
+
         d['ELEM_TYPE'] = d['ELEM_K']
         d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
@@ -160,23 +163,25 @@ def _parse_dict(d):
 
     # Check for active elements:
     try:
-        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM']) - 1
+        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM'], int) - 1
     except KeyError:
-        d['ACTV_ELEM'] = _tpd2vec('')
+        d['ACTV_ELEM'] = _tpd2vec('', int)
     except AttributeError:
         pass
 
     # Check for passive elements:
     try:
-        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM']) - 1
+        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM'], int) - 1
     except KeyError:
-        d['PASV_ELEM'] = _tpd2vec('')
+        d['PASV_ELEM'] = _tpd2vec('', int)
     except AttributeError:
         pass
 
     # Check if diagonal quadratic approximation is required:
     try:
-        d['APPROX'] = str.lower(d['APPROX'])
+
+        d['APPROX'] = d['APPROX'].lower()
+
     except KeyError:
         pass
 
@@ -223,7 +228,7 @@ def _parse_dict(d):
 
     return d
 
-def _tpd2vec(seq):
+def _tpd2vec(seq, dtype=float):
     """
     Convert a tpd file string to a vector, return a NumPy array.
 
@@ -236,23 +241,23 @@ def _tpd2vec(seq):
         array([], dtype=float64)
 
     """
-    finalvec = np.array([], int)
+    finalvec = np.array([], dtype)
     for s in seq.split(';'):
         if s.count('|'):
-            values = [int(v) for v in s.split('|')]
+            values = [dtype(v) for v in s.split('|')]
             values[1] += 1
             vec = np.arange(*values)
         elif s.count('@'):
             value, num = s.split('@')
             try:
-                vec = np.ones(int(num)) * float(value)
+                vec = np.ones(int(num)) * dtype(value)
             except ValueError:
                 raise ValueError('%s is incorrectly specified' % seq)
         else:
             try:
-                vec = [float(s)]
+                vec = [dtype(s)]
             except ValueError:
-                vec = np.array([])
+                vec = np.array([], dtype)
         finalvec = np.append(finalvec, vec)
     return finalvec
 
@@ -351,10 +356,12 @@ def _checkparams(d):
     # Check for rigid body motion and warn user:
     if d['DOF_PN'] == 2:
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d:
+
             Logger.display('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
     if d['DOF_PN'] == 3:
         if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d\
         or 'FXTR_NODE_Z' not in d:
             Logger.display('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
+
 
 # EOF parser.py

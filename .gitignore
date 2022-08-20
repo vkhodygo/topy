@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Python cache
+.mypy_cache/
+
 # C extensions
 *.so
 
@@ -23,6 +26,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+.ipynb_checkpoints/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -70,9 +75,15 @@ images/
 notes/
 old/
 testing/
+iterations/
 tutorial/
 *.K
 examples/*/*.png
 examples/*/*.vtk
+*.msh
 
-!src/*
+# VSCode
+.vscode/
+
+# DON'T (!) ignore what's inside imgsrc
+!imgsrc/*

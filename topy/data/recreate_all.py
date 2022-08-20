@@ -3,7 +3,13 @@
 
 from __future__ import print_function
 
+from __future__ import division
+
 from os import system, name
+
+from ..utils import get_logger
+
+logger = get_logger(__name__)
 
 if name == 'posix':
     system('rm Q4.K')
@@ -22,6 +28,7 @@ elif name == 'win32':
     system('del H8T.K')
     system('del H18B.K')
 else:
+
     print('This may take a while, perhaps a few minutes...')
     system('python Q4_K.py')
     print('1 of 7 done!')
@@ -37,5 +44,6 @@ else:
     print('6 of 7 done!')
     system('python H18B_K.py')
     print('7 of 7 done! All 3D matrices created. Finished.')
+
 
 # EOF recreate_all.py

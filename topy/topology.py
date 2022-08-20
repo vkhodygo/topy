@@ -8,6 +8,7 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
+
 from __future__ import division
 #from string import lower
 import numpy as np
@@ -20,13 +21,13 @@ from .topy_logging import Logger
 
 from .helper_functions import identity_minus_rows, update_add_mask_sym
 
-
+logger = get_logger(__name__)
+logger.info("Instantiated.")
 __all__ = ['Topology']
 
 
 MAX_ITERS = 250
 
-SOLID, VOID = 1.000, 0.001 #  Upper and lower bound value for design variables
 KDATUM = 0.1 #  Reference stiffness value of springs for mechanism synthesis
 
 # Constants for exponential approximation:
@@ -109,7 +110,6 @@ class Topology:
         See also: load_tpd_file
 
         """
-        Logger.thin_line()
         # Set all the mandatory minimum amount of parameters that constitutes
         # a completely defined topology optimisation problem:
         if not self.topydict:
@@ -130,23 +130,23 @@ class Topology:
         self.Ke = self.topydict['ELEM_K'] #  Element stiffness matrix
         self.K = self.topydict['K'] #  Global stiffness matrix
         if self.nelz:
-            Logger.display('Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x ' + \
+            logger.info('Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x ' + \
                 'NUM_ELEM_Z) = %d x %d x %d' % (self.nelx, self.nely, self.nelz))
         else:
-            Logger.display( 'Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d'\
+            logger.info( 'Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d'\
                 % (self.nelx, self.nely))
 
-        Logger.display('Element type (ELEM_K) =', self.topydict['ELEM_TYPE'])
-        Logger.display('Filter radius (FILT_RAD) =', self.filtrad)
+        logger.info('Element type (ELEM_K) = {}'.format(self.topydict['ELEM_TYPE']))
+        logger.info('Filter radius (FILT_RAD) = {}'.format(self.filtrad))
 
         # Check for either one of the following two, will take NUM_ITER if both
         # are specified.
         try:
             self.numiter = self.topydict['NUM_ITER'] #  Number of iterations
-            Logger.display('Number of iterations (NUM_ITER) = %d' % (self.numiter))
+            logger.info('Number of iterations (NUM_ITER) = %d' % (self.numiter))
         except KeyError:
             self.chgstop = self.topydict['CHG_STOP'] #  Change stop criteria
-            Logger.display('Change stop value (CHG_STOP) = %.3e (%.2f%%)' \
+            logger.info('Change stop value (CHG_STOP) = %.3e (%.2f%%)' \
                 % (self.chgstop, self.chgstop * 100))
             self.numiter = MAX_ITERS
 
@@ -186,8 +186,8 @@ class Topology:
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
-        Logger.display('Problem type (PROB_TYPE) = ' + self.probtype)
-        Logger.display('Problem name (PROB_NAME) = ' + self.probname)
+        logger.info('Problem type (PROB_TYPE) = ' + self.probtype)
+        logger.info('Problem name (PROB_NAME) = ' + self.probname)
 
         # Set extra parameters if specified:
         # (1) Continuation parameters for 'p':
@@ -213,29 +213,31 @@ class Topology:
                 #  Initial value of exponent for mech problems:
                 self.a = self.a * 7 / 3
             self.eta = 1 / (1 - self.a)
-            Logger.display('Damping factor (ETA) = exp')
+            logger.info('Damping factor (ETA) = exp')
         else:
             self.eta = float(self.topydict['ETA']) * np.ones(self.desvars.shape)
-            Logger.display('Damping factor (ETA) = %3.2f' % (self.eta.mean()))
+            logger.info('Damping factor (ETA) = %3.2f' % (self.eta.mean()))
 
         try:
-            self.approx = str.lower(self.topydict['APPROX'])
+
+            self.approx = self.topydict['APPROX'].lower()
+
         except KeyError:
             self.approx = None
         if self.approx == 'dquad':
-            Logger.display('Using diagonal quadratic approximation (APPROX = dquad)')
+            logger.info('Using diagonal quadratic approximation (APPROX = dquad)')
         # (5) Set passive elements:
         self.pasv = self.topydict['PASV_ELEM']
         if self.pasv.any():
-            Logger.display('Passive elements (PASV_ELEM) specified')
+            logger.info('Passive elements (PASV_ELEM) specified')
         else:
-            Logger.display('No passive elements (PASV_ELEM) specified')
+            logger.info('No passive elements (PASV_ELEM) specified')
         # (6) Set active elements:
         self.actv = self.topydict['ACTV_ELEM']
         if self.actv.any():
-            Logger.display('Active elements (ACTV_ELEM) specified')
+            logger.info('Active elements (ACTV_ELEM) specified')
         else:
-            Logger.display('No active elements (ACTV_ELEM) specified')
+            logger.info('No active elements (ACTV_ELEM) specified')
 
         # Set parameters for compliant mechanism synthesis, if they exist:
         if self.probtype == 'mech':
@@ -262,7 +264,6 @@ class Topology:
             else:
                 self.K.update_add_mask_sym([ksin], self.loaddof, maskin)
                 self.K.update_add_mask_sym([ksout], self.loaddofout, maskout)
-        Logger.thick_line()
 
     def fea(self):
         """
@@ -319,10 +320,12 @@ class Topology:
 
             self.dfree, info = spla.isolve.cg(Kfree, self.rfree, tol=1e-08, maxiter=8000)#, M=preK)
             if info < 0:
+
                 Logger.display('PySparse error: Type: {0}'.format(info))
                 raise Exception('Solution for FEA did not converge.')
             else:
                 Logger.display('ToPy: Solution for FEA converged.')
+
             if self.probtype == 'mech':  # mechanism synthesis
                 #(info, numitr, relerr) = \
                 #itsolvers.pcg(Kfree, self.rfreeout, self.dfreeout, 1e-8, \
@@ -330,6 +333,7 @@ class Topology:
 
                 self.dfreeout, info = spla.isolve.cg(Kfree, self.rfreeout, tol=1e-08, maxiter=8000)#, M=preK)
                 if info < 0:
+
                     Logger.display('PySparse error: Type: {0}'.format(info))
                     raise Exception('Solution for FEA of adjoint load case \
                         did not converge.')
@@ -340,6 +344,72 @@ class Topology:
             self.dout[self.freedof] = self.dfreeout
         # Increment internal iteration counter
         self.itercount += 1
+
+    def sens_analysis(self):
+        """
+        Determine the objective function value and perform sensitivity analysis
+        (find the derivatives of objective function). Return the design
+        sensitivities as a NumPy array.
+
+        EXAMPLES:
+            >>> t.sens_analysis()
+
+        See also: fea
+
+        """
+        if not self.topydict:
+            raise ToPyError('You must first load a TPD file!')
+        tmp = self.df.copy()
+        self.objfval  = 0.0 #  Objective function value
+        if self.nelz == 0: #  2D problem
+            for ely in xrange(self.nely):
+                for elx in xrange(self.nelx):
+                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                (ely + elx * (self.nely + 1))
+                    qe = self.d[e2sdofmap]
+                    qeTKeqe = dot(dot(qe, self.Ke), qe)
+                    if self.probtype == 'comp':
+                        self.objfval += (self.desvars[ely, elx] ** self.p) *\
+                        qeTKeqe
+                        tmp[ely, elx] = - self.p * self.desvars[ely, elx] **\
+                        (self.p - 1) * qeTKeqe
+                    elif self.probtype == 'heat':
+                        self.objfval += (self.void + (1 - self.void) * \
+                        self.desvars[ely, elx] ** self.p) * qeTKeqe
+                        tmp[ely, elx] = - (1 - self.void) * self.p * \
+                        self.desvars[ely, elx] ** (self.p - 1) * qeTKeqe
+                    elif self.probtype == 'mech':
+                        self.objfval = self.d[self.loaddofout]
+                        qeout = self.dout[e2sdofmap]
+                        tmp[ely, elx] = self.p * self.desvars[ely, elx]\
+                        ** (self.p - 1) * dot(dot(qe, self.Ke), qeout)
+        else: #  3D problem
+            for elz in xrange(self.nelz):
+                for ely in xrange(self.nely):
+                    for elx in xrange(self.nelx):
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1) + elz *\
+                                    (self.nelx + 1) * (self.nely + 1))
+                        qe = self.d[e2sdofmap]
+                        qeTKeqe = dot(dot(qe, self.Ke), qe)
+                        if self.probtype == 'comp':
+                            self.objfval += (self.desvars[elz, ely, elx] **\
+                            self.p) * qeTKeqe
+                            tmp[elz, ely, elx] = - self.p * self.desvars[elz, \
+                            ely, elx] ** (self.p - 1) * qeTKeqe
+                        elif self.probtype == 'heat':
+                            self.objfval += (self.void + (1 - self.void) * \
+                            self.desvars[elz, ely, elx] ** self.p) * qeTKeqe
+                            tmp[elz, ely, elx] = - (1 - self.void) *  self.p * \
+                            self.desvars[elz, ely, elx] ** (self.p - 1) * \
+                            qeTKeqe
+                        elif self.probtype == 'mech':
+                            self.objfval = self.d[self.loaddofout].sum()
+                            qeout = self.dout[e2sdofmap]
+                            tmp[elz, ely, elx] = self.p * \
+                            self.desvars[elz, ely, elx] ** (self.p - 1) * \
+                            dot(dot(qe, self.Ke), qeout)
+        self.df = tmp
 
     def filter_sens_sigmund(self):
         """
@@ -583,9 +653,9 @@ class Topology:
         # Change in design variables:
         self.change = (np.abs(self.desvars - self.desvarsold)).max()
 
-        # Solid-void fraction:
-        nr_s = self.desvars.flatten().tolist().count(SOLID)
-        nr_v = self.desvars.flatten().tolist().count(VOID)
+        # Solid-self.void fraction:
+        nr_s = self.desvars.flatten().tolist().count(self.solid)
+        nr_v = self.desvars.flatten().tolist().count(self.void)
         self.svtfrac = (nr_s + nr_v) / self.desvars.size
 
     # ===================================
@@ -619,7 +689,7 @@ class Topology:
                     if self.probtype == 'comp' or self.probtype == 'mech':
                         updatedKe = self.desvars[ely, elx] ** self.p * self.Ke
                     elif self.probtype == 'heat':
-                        updatedKe = (VOID + (1 - VOID) * \
+                        updatedKe = (self.void + (1 - self.void) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
                         
                     data  += updatedKe.reshape(updatedKe.size).tolist()
@@ -638,7 +708,7 @@ class Topology:
                             updatedKe = self.desvars[elz, ely, elx] ** \
                             self.p * self.Ke
                         elif self.probtype == 'heat':
-                            updatedKe = (VOID + (1 - VOID) * \
+                            updatedKe = (self.void + (1 - self.void) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
                             
                         data  += updatedKe.reshape(updatedKe.size).tolist()

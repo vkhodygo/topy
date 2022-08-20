@@ -10,15 +10,15 @@
 # =============================================================================
 """
 
-from __future__ import division
-from __future__ import print_function
-
 from os import path
 
 from numpy import array, linspace, unique, sqrt, round, load
 from numpy.linalg import eigvalsh
 
+from .utils import get_logger
 from .data.matlcons import _a, _nu, _E
+
+logger = get_logger(__name__)
 
 __all__ = ['Q4', 'Q5B',  'Q4a5B',  'Q4T',\
            'H8', 'H18B', 'H8T']
@@ -41,43 +41,51 @@ pth = path.join(path.split(__file__)[0], 'data')
 # ==============================================
 fname = path.join(pth, 'Q4bar.K')
 try:
-    Q4bar = load(fname)
+
+    Q4bar = load(fname, allow_pickle=True)
 except (IOError, FileNotFoundError):
     print('It seems as though all or some of the element stiffness matrices')
     print('do not exist. Creating them...')
     print('This is usually only required once and may take a few minutes.')
     from .data import Q4bar_K
-    Q4bar = load(fname)
+    Q4bar = load(fname, allow_pickle=True)
+
 
 # ==========================================================================
 # === Stiffness matrix of a square 4 node plane stress bi-linear element ===
 # ==========================================================================
 fname = path.join(pth, 'Q4.K')
 try:
-    Q4 = load(fname)
+    Q4 = load(fname, allow_pickle=True)
 except IOError:
-    from .data import Q4_K
-    Q4 = load(fname)
+
+    from topy.data import Q4_K
+    Q4 = load(fname, allow_pickle=True)
+
 
 # =========================================================================
 # === Stiffness matrix of a square 4 node plane stress '5-beta' element ===
 # =========================================================================
 fname = path.join(pth, 'Q5B.K')
 try:
-    Q5B = load(fname)
+    Q5B = load(fname, allow_pickle=True)
 except IOError:
-    from .data import Q5B_K
-    Q5B = load(fname)
+
+    from topy.data import Q5B_K
+    Q5B = load(fname, allow_pickle=True)
+
 
 # =========================================================
 # === Matrix for an element used in 2D thermal problems ===
 # =========================================================
 fname = path.join(pth, 'Q4T.K')
 try:
-    Q4T = load(fname)
+    Q4T = load(fname, allow_pickle=True)
 except IOError:
-    from .data import Q4T_K
-    Q4T = load(fname)
+
+    from topy.data import Q4T_K
+    Q4T = load(fname, allow_pickle=True)
+
 
 # ===========================================================
 # === Stiffness matrix of a square 4 node 'Q4a5B' element ===
@@ -99,20 +107,23 @@ Q4a5B = Q4 - alpha2D * _E * Q4bar  # stiffness matrix
 # ======================================================================
 fname = path.join(pth, 'H8.K')
 try:
-    H8 = load(fname)
+    H8 = load(fname, allow_pickle=True)
 except IOError:
-    from .data import H8_K
-    H8 = load(fname)
+
+    from topy.data import H8_K
+    H8 = load(fname, allow_pickle=True)
+
 
 # ============================================================
 # === Stiffness matrix of a cubic 8 node '18-beta' element ===
 # ============================================================
 fname = path.join(pth, 'H18B.K')
 try:
-    H18B = load(fname)
+    H18B = load(fname, allow_pickle=True)
 except IOError:
-    from .data import H18B_K
-    H18B = load(fname)
+
+    from topy.data import H18B_K
+    H18B = load(fname, allow_pickle=True)
 
 # ==========================================================================
 # === Stiffness matrix for a hexahedron 8 node tri-linear 3D element for ===
@@ -120,9 +131,11 @@ except IOError:
 # ==========================================================================
 fname = path.join(pth, 'H8T.K')
 try:
-    H8T = load(fname)
+    H8T = load(fname, allow_pickle=True)
 except IOError:
-    from .data import H8T_K
-    H8T = load(fname)
+
+    from topy.data import H8T_K
+    H8T = load(fname, allow_pickle=True)
+
 
 # EOF elements.py
