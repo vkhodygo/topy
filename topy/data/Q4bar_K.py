@@ -12,23 +12,23 @@
 # Copyright (C) 2008, 2015, William Hunter.
 # =============================================================================
 """
-
 from __future__ import division
 
-from sympy import symbols, Matrix, diff, integrate, zeros
+import os
 
+from sympy import symbols, Matrix, diff, integrate, zeros
 from numpy import abs, array
 
-from matlcons import *
+from ..utils import get_logger, get_data_file
+from .matlcons import *
 
+logger = get_logger(__name__)
 # Get file name:
-fname = __file__.split('_')[0] + '.K'
+fname = get_data_file(__file__)
 
-try:
-    f = open(fname)
-    print fname ,'(stiffness matrix) exists!'
-    f.close()
-except IOError:
+if os.path.exists(fname):
+    logger.info('{} (stiffness matrix) exists!'.format(fname))
+else:
     # SymPy symbols:
     a, b, x, y = symbols('a b x y')
     E, nu = symbols('E nu')
@@ -44,9 +44,9 @@ except IOError:
     N4 = (a - x) * (b + y) / (4 * a * b)
 
     # Create strain-displacement matrix B:
-    B0 = map(diff, [N1, 0, N2, 0, N3, 0, N4, 0], xlist)
-    B1 = map(diff, [0, N1, 0, N2, 0, N3, 0, N4], ylist)
-    B2 = map(diff, [N1, N1, N2, N2, N3, N3, N4, N4], yxlist)
+    B0 = tuple(map(diff, [N1, 0, N2, 0, N3, 0, N4, 0], xlist))
+    B1 = tuple(map(diff, [0, N1, 0, N2, 0, N3, 0, N4], ylist))
+    B2 = tuple(map(diff, [N1, N1, N2, N2, N3, N3, N4, N4], yxlist))
     B = Matrix([B0, B1, B2])
 
     # Create constitutive (material property) matrix for plane stress:
@@ -57,12 +57,12 @@ except IOError:
     CB = C * B
 
     # Create delB matrix:
-    delCB0x = array(map(diff, CB[0, :], xlist))
-    delCB0y = array(map(diff, CB[2, :], ylist))
+    delCB0x = array(tuple(map(diff, CB[0, :], xlist)))
+    delCB0y = array(tuple(map(diff, CB[2, :], ylist)))
     delCB0 = delCB0x + delCB0y
 
-    delCB1y = array(map(diff, CB[1, :], ylist))
-    delCB1x = array(map(diff, CB[2, :], xlist))
+    delCB1y = array(tuple(map(diff, CB[1, :], ylist)))
+    delCB1x = array(tuple(map(diff, CB[2, :], xlist)))
     delCB1 = delCB1y + delCB1x
 
     Bbar = Matrix([delCB0.tolist(), delCB1.tolist()])
@@ -70,7 +70,7 @@ except IOError:
     dKbar = Bbar.T * Bbar #  a matrix of constants, i.e., no x or y vals
 
     # Integration:
-    print 'SymPy is integrating: K for Q4bar...'
+    logger.info('SymPy is integrating: K for Q4bar...')
     Kbar = dKbar.integrate((x, -a, a),(y, -b, b))
 
     # Convert SymPy Matrix to NumPy array:
@@ -81,6 +81,6 @@ except IOError:
 
     # Create file:
     K.dump(fname)
-    print 'Created', fname, '(stiffness matrix).'
+    logger.info('Created ' + fname + ' (stiffness matrix).')
 
 # EOF Q4bar_K.py
