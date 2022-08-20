@@ -12,6 +12,7 @@ import os
 
 import sys
 from datetime import datetime
+import struct
 
 from pylab import axis, close, cm, figure, imshow, savefig, title
 from numpy import arange, asarray, hstack, uint8 
@@ -27,7 +28,9 @@ if not os.environ.get("DISPLAY"):
 from pylab import axis, close, cm, figure, imshow, savefig, title
 
 __all__ = ['create_2d_imag', 'create_3d_geom', 'node_nums_2d', 'node_nums_3d',
+
 'create_2d_msh','create_3d_msh', 'save_3d_array']
+
 
 def create_2d_imag(x, **kwargs):
     """
@@ -137,15 +140,16 @@ def create_3d_geom(x, **kwargs):
 
 
 def save_3d_array(x, iternum, **kwargs):
-    with open(os.path.join("iterations", str(iternum) + "_array.txt"), "w") \
-         as file:
-        file.write(str(x.shape[0])+","+str(x.shape[1])+"," + str(x.shape[2]))
-        file.write(os.linesep)
+    with open(os.path.join(kwargs['dir'], "%s_%03d.bin" % (kwargs['prefix'], iternum)), "wb") as f:
+        ds = []
         for i in range(x.shape[0]):
             for j in range(x.shape[1]):
                 for k in range(x.shape[2]):
-                    file.write(str(x[i][j][k]))
-                    file.write(",")
+                    ds.append(x[i][x.shape[1] - j - 1][k])
+        f.write(struct.pack('qqq', x.shape[2], x.shape[1], x.shape[0]))
+        f.write(struct.pack('qq', len(ds), 1))
+        for i in range(len(ds)):
+            f.write(struct.pack('d', ds[i]))
 
 
 def create_2d_msh(nelx, nely, fname):
