@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # ==============================================================================
 # Material constants and finite element dimensions.
 #
