@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Functions in order to visualise 2D and 3D NumPy arrays.
 #
@@ -6,7 +7,9 @@
 # Copyright (C) 2008, 2015, 2016, 2017 William Hunter.
 # =============================================================================
 """
+
 import os
+
 import sys
 from datetime import datetime
 
@@ -59,7 +62,7 @@ def create_2d_imag(x, **kwargs):
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
     figure() # open a figure
-    if kwargs.has_key('title'):
+    if 'title' in kwargs:
         title(kwargs['title'])
         imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
     imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
@@ -335,7 +338,9 @@ def _write_geom(x, fname):
         _write_legacy_vtu(x, fname)
     else:
         print('Other file formats not implemented, only legacy VTK.')
+
         #_write_vrml2(x, fname) # future
+
 
 def _write_legacy_vtu(x, fname):
     """
@@ -360,9 +365,9 @@ def _write_legacy_vtu(x, fname):
     except ValueError:
         sys.exit('Array dimensions not equal to 3, possibly 2-dimensional.\n')
 
-    for i in xrange(depth):
-        for j in xrange(rows):
-            for k in xrange(columns):
+    for i in range(depth):
+        for j in range(rows):
+            for k in range(columns):
                 if x[i,j,k] > THRESHOLD:
                     xculled.append(x[i,j,k])
                     points += (voxel_local_points + [i,j,k]).tolist()

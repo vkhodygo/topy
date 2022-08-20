@@ -1,4 +1,4 @@
-﻿"""
+"""
 # ==============================================================================
 # ToPy -- Topology optimization with Python.
 # Copyright (C) 2012, 2015, 2016, 2017 William Hunter.
@@ -17,5 +17,8 @@ __all__ = (
 	topology.__all__ +
 	visualisation.__all__ +
 	elements.__all__ +
+
+  topy_logging.__all__ +
+
 	optimisation.__all__
 )
