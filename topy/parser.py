@@ -241,25 +241,28 @@ def _tpd2vec(seq, dtype=float):
         array([], dtype=float64)
 
     """
-    finalvec = np.array([], dtype)
+    finalvec = []
     for s in seq.split(';'):
         if s.count('|'):
             values = [dtype(v) for v in s.split('|')]
             values[1] += 1
-            vec = np.arange(*values)
+            if len(values) == 2:
+                values.append(1)
+            val = values[0]
+            while val < values[1]:
+                finalvec.append(val)
+                val += values[2]
         elif s.count('@'):
             value, num = s.split('@')
-            try:
-                vec = np.ones(int(num)) * dtype(value)
-            except ValueError:
-                raise ValueError('%s is incorrectly specified' % seq)
+            num = int(num)
+            for _ in range(num):
+                finalvec.append(dtype(value))
         else:
             try:
-                vec = [dtype(s)]
+                finalvec.append(dtype(s))
             except ValueError:
-                vec = np.array([], dtype)
-        finalvec = np.append(finalvec, vec)
-    return finalvec
+                pass
+    return np.array(finalvec, dtype)
 
 def _dofvec(x, y, z, dofpn):
     """
