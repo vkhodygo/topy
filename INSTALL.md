@@ -1,5 +1,5 @@
 # Dependencies
-It shouldn't take you more than a few minutes to download and install everything.
+There always are... It shouldn't take more than a few minutes to download and install everything.
 
 ## All platforms
 Install Python 2.7.13 (32 or 64 bit) - make sure your 'bitness' is correct
@@ -24,9 +24,6 @@ I have a 'real' job.
 
 The same is of course not true for Linux/Mac systems, so you may very well be
 able to get ToPy to work with Python 3.x -- I've not tried.
-
-**Consider to use a virtual Python 2.7 environment, using `pyenv` or `conda`
-or one of the other tools available to set up virtual environments for Python.**
 
 ## Windows
 1. Make sure Python is in your 'Path' Environment Variables. *How?*
@@ -70,8 +67,6 @@ also work fine (in that ToPy should still work).
 If everything installed correctly, you're ready to install ToPy.
 
 # Installing ToPy
-Download the stable topy release or clone.
-
 CD into the 'topy' directory (where 'setup.py' is located) and
 in a terminal ('cmd' on Windows), type:
 
@@ -118,5 +113,4 @@ solving a problem by simply running 'optimise.py' in the 'scripts' folder.
 --
 
 William Hunter
-Created: 2017-08-21
-Last update: 2020-04-26
+Date: 2017-08-21
