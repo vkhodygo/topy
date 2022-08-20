@@ -1,12 +1,31 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
+"""
+ToPy install script.
 
-from distutils.core import setup
+Install ToPy through `python setup.py install`.
+"""
 
-setup(name='ToPy',
-      version='0.2.1',
-      description='Topology optimization with Python',
-      author='William Hunter',
-      url='https://github.com/williamhunter/ToPy',
-      packages=['topy', 'topy.data'],
-      package_dir={'topy': ''}
-     )
+import json
+import setuptools
+
+# Get metadata.
+with open("metadata.json", "r") as f:
+    metadata = json.load(f)
+
+# Get project description.
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+setuptools.setup(
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    packages=["topy", "topy.data"],
+    install_requires=['typing', 'pathlib', 'matplotlib', 'sympy', 'numpy<=1.14', 'pyvtk', 'pysparse'],
+    classifiers=[
+        "Programming Language :: Python :: 2",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires='~=2.7',
+    **metadata
+)
