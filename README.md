@@ -1,26 +1,38 @@
+![pytest](https://github.com/mlaradji/topy/workflows/pytest/badge.svg)
+
 # ToPy
 <div align="center">
-	<img src="./imgsrc/ToPy_logo.png">
+	<img src="./imgsrc/topy_logo3d.png" width="400">
 </div>
 
 ToPy is a lightweight topology optimization framework for Python that can solve
 compliance (stiffness), mechanism synthesis and heat conduction problems in 2D and 3D.
 Please refer to the [ToPy Wiki](https://github.com/williamhunter/topy/wiki) for further information.
 
-ToPy was originally hosted on Google Code.
+## Example of a ToPy result
+An [example TPD file and solution/result](https://github.com/williamhunter/ToPy/wiki/Examples-of-ToPy-results)
 
 ## Installation
-Once you've downloaded the depenencies (see the [INSTALL](https://github.com/williamhunter/topy/blob/master/INSTALL.md)
+**NOTE**: I've added a 0.4.1 release, which is older then the master branch, but will get you up and running with Python 2 and
+Pysparse if you're willing to use the Anaconda Python distribution
+
+Once you've downloaded the dependencies (see the [INSTALL](https://github.com/williamhunter/topy/blob/master/INSTALL.md)
 file) all you need to do is the following:
 
+Download the latest **stable release** from here: https://github.com/williamhunter/topy/releases/latest
+
+Then do
+
 ```bash
-$ git clone https://github.com/williamhunter/topy.git
 $ cd topy/topy
 $ python setup.py install
 ```
 
-Alternatively, you can download the latest stable release, but it usually lags
-a little behind the Master branch (as can be expected).
+
+### ToPy and Python 3
+ToPy is fairly old. I started working on it in 2005 and finished it around 2009, so that implies that the stable release only 
+works with Python 2. You can however pull the latest "unstable" version, which should work with Python 3 (thanks to the
+efforts of other people).
 
 ## Getting started
 The main class of **ToPy** is 'Topology'. It defines the main constraints,
@@ -133,11 +145,8 @@ convert -delay 35 *.png anim.gif
 ## Tutorials
 [Tutorials](https://github.com/williamhunter/topy/wiki/Tutorials)
 
-## Solved examples
-[Examples](https://github.com/williamhunter/topy/wiki/Examples)
-
 ## How to cite ToPy
-If you've used ToPy in your research work, please consider to cite:
+If you've used ToPy in your research work or find it useful in any way, please consider to cite:
 ```
 @misc{Hunter2007william,
   author = {Hunter, William and others},

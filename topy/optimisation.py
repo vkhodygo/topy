@@ -1,18 +1,19 @@
-import logging
 from os import path, makedirs
 from time import time
+
 from numpy import array
 
+from .utils import get_logger
 from .visualisation import *
 from .topology import *
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 __all__ = ['optimise']
 
 def optimise(topology, save=True, dir='./iterations'):
-
+    # type: (Topology, bool, str) -> None
     if not path.exists(dir):
         makedirs(dir)
     etas_avg = []
