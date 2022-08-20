@@ -1,0 +1,61 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: master
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-ast
+      - id: check-builtin-literals
+      # - id: check-byte-order-marker
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: check-xml
+      - id: check-yaml
+      - id: debug-statements
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      # - id: fix-encoding-pragma
+      - id: name-tests-test
+      - id: pretty-format-json
+        args: ["--autofix", "--indent=2"]
+      - id: requirements-txt-fixer
+      - id: sort-simple-yaml
+      - id: trailing-whitespace
+
+  - repo: https://github.com/prettier/prettier
+    rev: master
+    hooks:
+      - id: prettier
+
+  - repo: https://github.com/asottile/reorder_python_imports
+    rev: master
+    hooks:
+      - id: reorder-python-imports
+
+  - repo: https://github.com/psf/black
+    rev: stable
+    hooks:
+      - id: black
+        language_version: python3.8
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: master
+    hooks:
+      - id: pyupgrade
+
+  - repo: https://github.com/PyCQA/prospector
+    rev: master # The version of Prospector to use, at least 1.1.7
+    hooks:
+      - id: prospector
+        additional_dependencies:
+          - prospector[with_mypy,with_bandit,with_pyroma]
+          - numpy
+          - scipy
+          - sympy
+          - pyvtk
+          - matplotlib
