@@ -6,11 +6,12 @@
 # Copyright (C) 2008, 2015, 2016, 2017 William Hunter.
 # =============================================================================
 """
+from typing import Any
 import os
 import sys
 from datetime import datetime
 
-from numpy import arange, asarray, hstack
+import numpy as np
 from pyvtk import CellData, LookupTable, Scalars, UnstructuredGrid, VtkData
 
 # Instruct matplotlib to use the 'Agg' if no display was detected, as matplotlib uses a GUI by default.
@@ -78,7 +79,8 @@ def create_2d_imag(x, **kwargs):
     savefig(fname, bbox_inches='tight')
     close() # close the figure
 
-def create_3d_geom(x, **kwargs):
+def create_3d_geom(x, vtk_format="binary", **kwargs):
+    # type: (np.ndarray, str, **Any) -> None
     """
     Create 3D geometry from a 3D NumPy array.
 
@@ -93,6 +95,7 @@ def create_3d_geom(x, **kwargs):
 
     INPUTS:
         x -- K-by-M-by-N array (depth x rows x columns)
+        legacy_format -- Sets the format for the PyVTK output. One of "binary" or "ascii".
 
     OUTPUTS:
         <filename>.<type>
@@ -117,7 +120,7 @@ def create_3d_geom(x, **kwargs):
     # Change the default filename based on keyword arguments, if necessary:
     fname = _change_fname(fname_dict, kwargs)
     # Save the domain as geometry:
-    _write_geom(x, fname)
+    _write_geom(x, fname, vtk_format=vtk_format)
 
 def create_2d_msh(nelx, nely, fname):
     """
@@ -144,8 +147,8 @@ def create_2d_msh(nelx, nely, fname):
     # Total number of nodes in mesh
     nnodes = (nelx + 1) * (nely + 1)
     # x and y coordinates of elements
-    xcoords = arange(nelx + 1)
-    ycoords = - arange(nely + 1)
+    xcoords = np.arange(nelx + 1)
+    ycoords = - np.arange(nely + 1)
     # Total number of elements
     nelms = nelx * nely
 
@@ -167,7 +170,7 @@ def create_2d_msh(nelx, nely, fname):
         outputfile.write(MSH_elements[0])
         outputfile.write(str(nelms)+'\n')
         # elm-number elm-type number-of-tags < tag > ... node-number-list
-        for elem in arange(1, nelms + 1):
+        for elem in np.arange(1, nelms + 1):
             outputfile.write(str(elem) + ' 3 0 ') # 3 is a 4-node quadrangle
             nn = node_nums_2d(nelx, nely, elem)
             outputfile.write(str(nn[0]) + ' ' + str(nn[1]) + ' ' + str(nn[3]) + ' ' + str(nn[2]) + '\n')
@@ -199,9 +202,9 @@ def create_3d_msh(nelx, nely, nelz, fname):
     # Total number of nodes in mesh
     nnodes = (nelx + 1) * (nely + 1) * (nelz + 1)
     # x, y and z coordinates of elements
-    xcoords = arange(nelx + 1)
-    ycoords = - arange(nely + 1)
-    zcoords = arange(nelz + 1)
+    xcoords = np.arange(nelx + 1)
+    ycoords = - np.arange(nely + 1)
+    zcoords = np.arange(nelz + 1)
     # Total number of elements
     nelms = nelx * nely * nelz
 
@@ -224,7 +227,7 @@ def create_3d_msh(nelx, nely, nelz, fname):
         outputfile.write(MSH_elements[0])
         outputfile.write(str(nelms)+'\n')
         # elm-number elm-type number-of-tags < tag > ... node-number-list
-        for elem in arange(1, nelms + 1):
+        for elem in np.arange(1, nelms + 1):
             outputfile.write(str(elem) + ' 5 0 ') # 5 is a 8-node hexahedron
             nn = node_nums_3d(nelx, nely, nelz, elem)
             outputfile.write(str(nn[0]) + ' ' + str(nn[1]) + ' ' + str(nn[3]) + ' ' + str(nn[2]) + ' ' + \
@@ -256,7 +259,7 @@ def node_nums_2d(nelx, nely, en):
     """
     if en > nelx * nely:
         raise Exception('Mesh does not contain specified element number.')
-    inn = asarray([0, 1, nely + 1, nely + 2]) #  initial node numbers
+    inn = np.asarray([0, 1, nely + 1, nely + 2]) #  initial node numbers
     nn = inn + (en + (en - 1) // nely) #  the element's node numbers
     return nn
 
@@ -297,7 +300,7 @@ def node_nums_3d(nelx, nely, nelz, en):
     zinc = (en - 1) // xygridsize * (nelx + 1) * (nely + 1)
     nnr = nnzero + zinc
     nnf = nnr + (nelx + 1) * (nely + 1)
-    nn = hstack( (nnr, nnf) )
+    nn = np.hstack( (nnr, nnf) )
     return nn
 
 # =====================================
@@ -327,27 +330,24 @@ def _change_fname(fd, kwargs):
 
     return filename
 
-def _write_geom(x, fname):
-    '''
-    Determines what geometry format (file type) to create.
-    '''
+def _write_geom(x, fname, vtk_format="binary"):
+    # type: (np.ndarray, str, str) -> None
+    """Determine what geometry format (file type) to create."""
     if fname.endswith('vtk', -3):
-        _write_legacy_vtu(x, fname)
+        _write_legacy_vtu(x, fname, vtk_format="binary")
     else:
         print('Other file formats not implemented, only legacy VTK.')
         #_write_vrml2(x, fname) # future
 
-def _write_legacy_vtu(x, fname):
-    """
-    Write a legacy VTK unstructured grid file.
-
-    """
+def _write_legacy_vtu(x, fname, vtk_format="binary"):
+    # type: (np.ndarray, str, str) -> None
+    """Write a legacy VTK unstructured grid file."""
     # Lower bound value used for pixel/voxel culling, any value below this
     # value won't be plotted. Should be same as VOID's value in 'topology.py'.
     THRESHOLD = 0.001
 
     # Voxel local points relative to its centre of geometry:
-    voxel_local_points = asarray([[-1,-1,-1],[ 1,-1,-1],[-1, 1,-1],[ 1, 1,-1],
+    voxel_local_points = np.asarray([[-1,-1,-1],[ 1,-1,-1],[-1, 1,-1],[ 1, 1,-1],
                                 [-1,-1, 1],[ 1,-1, 1],[-1, 1, 1],[ 1, 1, 1]])\
                                   * 0.5 # scaling
     # Voxel world points:
@@ -367,7 +367,7 @@ def _write_legacy_vtu(x, fname):
                     xculled.append(x[i,j,k])
                     points += (voxel_local_points + [i,j,k]).tolist()
 
-    voxels = arange(len(points)).reshape(len(xculled), 8).tolist()
+    voxels = np.arange(len(points)).reshape(len(xculled), 8).tolist()
     topology = UnstructuredGrid(points, voxel = voxels)
     file_header = \
     'ToPy data, created '\
@@ -375,7 +375,7 @@ def _write_legacy_vtu(x, fname):
     scalars = CellData(Scalars(xculled, name='Densities', lookup_table =\
     'default'))
     vtk = VtkData(topology, file_header, scalars)
-    vtk.tofile(fname, 'binary')
+    vtk.tofile(fname, format=vtk_format)
 
 def _timestamp():
     """

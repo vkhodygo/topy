@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 
 __all__ = ['optimise']
 
-def optimise(topology, save=True, dir='./iterations'):
-    # type: (Topology, bool, str) -> None
+def optimise(topology, save=True, dir='./iterations', vtk_format="binary"):
+    # type: (Topology, bool, str, str) -> None
     if not path.exists(dir):
         makedirs(dir)
     etas_avg = []
@@ -30,7 +30,8 @@ def optimise(topology, save=True, dir='./iterations'):
                 'prefix': t.probname,
                 'iternum': t.itercount,
                 'time': 'none',
-                'dir': dir
+                'dir': dir,
+                'vtk_format': vtk_format
             }
             if save:
                 create_3d_geom(t.desvars, **params)
@@ -69,7 +70,7 @@ def optimise(topology, save=True, dir='./iterations'):
         while topology.change > topology.chgstop:
             _optimise(topology)
     except AttributeError:
-        for i in range(topology.numiter):
+        for _ in range(topology.numiter):
             _optimise(topology)
     te = time()
 
