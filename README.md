@@ -23,7 +23,10 @@ file) all you need to do is the following:
 
 Download the latest **stable release** from here: https://github.com/TarcisioLOliveira/topy/releases/latest
 
-Then do
+ToPy solves the defined problem to obtain a 2D (or 3D, depending on the input file) checker-free black-white (in 2D) or solid-void (in 3D) solution. The result is
+1. an optimally stiff structure for minimum compliance (maximum stiffness) problems,
+2. an optimal distribution of two materials for heat conduction problems and
+3. an optimal distribution of material for efficient mobility.
 
 ```bash
 cd topy/topy

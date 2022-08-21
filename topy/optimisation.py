@@ -8,6 +8,7 @@
 # =============================================================================
 """
 
+# -*- coding: utf-8 -*-
 from os import path, makedirs
 from time import time
 
@@ -23,7 +24,7 @@ import pstats
 logger = get_logger(__name__)
 
 
-__all__ = ['optimise']
+__all__ = ["optimise"]
 
 def optimise(topology, save=True, dir='./iterations', apikey=''):
     # type: (Topology, bool, str) -> None

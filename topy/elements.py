@@ -25,10 +25,10 @@ __all__ = ['create_element']
 # ===================================================
 # === Messages used for errors, information, etc. ===
 # ===================================================
-MSG0 = 'finite element stiffness matrix.'
+MSG0 = "finite element stiffness matrix."
 
-MSG1 = 'Element stiffness matrices does not exist.\n Created... Please re-run \
-your last attempt.'
+MSG1 = "Element stiffness matrices does not exist.\n Created... Please re-run \
+your last attempt."
 
 
 # ==================================================

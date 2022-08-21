@@ -64,8 +64,6 @@ After the function `deactivate ()`. You can then enter the virtual environment
 with `source ~/venv-topy/bin/activate` and leave it with `deactivate`.
 
 # Installing ToPy
-Download the stable topy release or clone.
-
 CD into the 'topy' directory (where 'setup.py' is located) and
 in a terminal ('cmd' on Windows), type:
 

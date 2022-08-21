@@ -26,19 +26,30 @@ from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
 from .visualisation import *
 
+from . import utils
+from .parser import config2dict
+from .parser import tpd_file2dict
+
 from .helper_functions import identity_minus_rows, update_add_mask_sym
 
 logger = get_logger(__name__)
 __all__ = ['TopologyTrad']
 
 
+__all__ = ["Topology"]
+
+
 MAX_ITERS = 250
 
 KDATUM = 0.1 #  Reference stiffness value of springs for mechanism synthesis
+SOLID, VOID = 1.000, 0.001  #  Upper and lower bound value for design variables
+KDATUM = 0.1  #  Reference stiffness value of springs for mechanism synthesis
 
 # Constants for exponential approximation:
-A_LOW = -3 #  Lower restriction on 'a' for exponential approximation
-A_UPP = -1e-5 #  Upper restriction on 'a' for exponential approximation
+
+A_LOW = -3  #  Lower restriction on 'a' for exponential approximation
+A_UPP = -1e-5  #  Upper restriction on 'a' for exponential approximation
+
 
 
 # =======================
@@ -48,26 +59,41 @@ class TopologyTrad:
     """
     A class to optimise the topology of a design domain for defined boundary
     values. Data is read from an input file (see 'examples' folder).
-
     """
-    def __init__(self, config=None, topydict={}, pcount=0,
-                 qcount=0, itercount=0, change=1, svtfrac=None):
-        self.pcount = pcount #  Counter for continuation of p
-        self.qcount = qcount #  Counter for continuation of q for GSF
-        self.itercount = itercount #  Internal counter
+
+    def __init__(
+        self,
+
+        config=None,
+        topydict=None,
+        pcount=0,
+        qcount=0,
+        itercount=0,
+        change=1,
+        svtfrac=None,
+    ):
+
+        # `{}` is an unsafe default argument.
+        if topydict is None:
+            topydict = {}
+
+
+        self.pcount = pcount  #  Counter for continuation of p
+        self.qcount = qcount  #  Counter for continuation of q for GSF
+        self.itercount = itercount  #  Internal counter
         self.change = change
         self.svtfrac = svtfrac
 
         if config:
             self.topydict = config2dict(config.copy())
         else:
-            self.topydict = topydict #  Store tpd file data in dictionary
+            self.topydict = topydict  #  Store tpd file data in dictionary
 
 
     # ======================
     # === Public methods ===
     # ======================
-    def load_tpd_file(self, fname):
+    def load_tpd_file(self, fname: str):
         """
         DEPRECATED. Need to check TO_TYPE before instantiating.
         Load a ToPy problem definition (TPD) file, return a dictionary:
@@ -139,24 +165,34 @@ class TopologyTrad:
         self.Ce = self.topydict['ELEM_C'] #  Element linear elastic modulus matrix
         self.K = self.topydict['K'] #  Global stiffness matrix
         if self.nelz:
-            logger.info('Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x ' + \
-                'NUM_ELEM_Z) = %d x %d x %d' % (self.nelx, self.nely, self.nelz))
-        else:
-            logger.info( 'Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d'\
-                % (self.nelx, self.nely))
+            logger.info(
 
-        logger.info('Element type (ELEM_K) = {}'.format(self.topydict['ELEM_TYPE']))
-        logger.info('Filter radius (FILT_RAD) = {}'.format(self.filtrad))
+                "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y x "
+                + "NUM_ELEM_Z) = %d x %d x %d" % (self.nelx, self.nely, self.nelz)
+            )
+        else:
+            logger.info(
+                "Domain discretisation (NUM_ELEM_X x NUM_ELEM_Y) = %d x %d"
+                % (self.nelx, self.nely)
+            )
+
+        logger.info("Element type (ELEM_K) = {}".format(self.topydict["ELEM_TYPE"]))
+        logger.info("Filter radius (FILT_RAD) = {}".format(self.filtrad))
+
 
         # Check for either one of the following two, will take NUM_ITER if both
         # are specified.
         try:
-            self.numiter = self.topydict['NUM_ITER'] #  Number of iterations
-            logger.info('Number of iterations (NUM_ITER) = %d' % (self.numiter))
+            self.numiter = self.topydict["NUM_ITER"]  #  Number of iterations
+
+            logger.info("Number of iterations (NUM_ITER) = %d" % (self.numiter))
         except KeyError:
-            self.chgstop = self.topydict['CHG_STOP'] #  Change stop criteria
-            logger.info('Change stop value (CHG_STOP) = %.3e (%.2f%%)' \
-                % (self.chgstop, self.chgstop * 100))
+            self.chgstop = self.topydict["CHG_STOP"]  #  Change stop criteria
+            logger.info(
+                "Change stop value (CHG_STOP) = %.3e (%.2f%%)"
+                % (self.chgstop, self.chgstop * 100)
+
+            )
             self.numiter = MAX_ITERS
 
         self.stress = 0.0 # Current maximum stress
@@ -178,7 +214,7 @@ class TopologyTrad:
         # per node, not so, Cartesian dimension also plays a role.
         # Thus, the 'if'* below is a hack for this to work, and it does...
         if self.dofpn == 1:
-            if self.nelz == 0: #  *had to this
+            if self.nelz == 0:  #  *had to this
                 self.e2sdofmapi = self.e2sdofmapi[0:4]
                 self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
                     (self.nely + 1))
@@ -210,68 +246,73 @@ class TopologyTrad:
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
-        logger.info('Problem type (PROB_TYPE) = ' + self.probtype)
-        logger.info('Problem name (PROB_NAME) = ' + self.probname)
+
+        logger.info("Problem type (PROB_TYPE) = " + self.probtype)
+        logger.info("Problem name (PROB_NAME) = " + self.probname)
+
 
         # Set extra parameters if specified:
         # (1) Continuation parameters for 'p':
-        self._pmax = self.topydict.get('P_MAX', 1)
-        self._phold = self.topydict.get('P_HOLD', self.numiter)
-        self._pincr = self.topydict.get('P_INCR')
-        self._pcon = self.topydict.get('P_CON', self.numiter)
+        self._pmax = self.topydict.get("P_MAX", 1)
+        self._phold = self.topydict.get("P_HOLD", self.numiter)
+        self._pincr = self.topydict.get("P_INCR")
+        self._pcon = self.topydict.get("P_CON", self.numiter)
 
         # (2) Extra penalisation factor (q) and continuation parameters:
-        self.q = self.topydict.get('Q_FAC', 1)
+        self.q = self.topydict.get("Q_FAC", 1)
 
-        self._qmax = self.topydict.get('Q_MAX', self.q)
-        self._qhold = self.topydict.get('Q_HOLD', self.numiter)
-        self._qincr = self.topydict.get('Q_INCR')
-        self._qcon = self.topydict.get('Q_CON', self.numiter)
-
+        self._qmax = self.topydict.get("Q_MAX", self.q)
+        self._qhold = self.topydict.get("Q_HOLD", self.numiter)
+        self._qincr = self.topydict.get("Q_INCR")
+        self._qcon = self.topydict.get("Q_CON", self.numiter)
 
         # (3) Exponential approximation of eta:
-        if self.topydict['ETA'] == 'exp':
+        if self.topydict["ETA"] == "exp":
             #  Initial value of exponent for comp and heat problems:
-            self.a = - np.ones(self.desvars.shape)
-            if self.probtype == 'mech':
+            self.a = -np.ones(self.desvars.shape)
+            if self.probtype == "mech":
                 #  Initial value of exponent for mech problems:
                 self.a = self.a * 7 / 3
             self.eta = 1 / (1 - self.a)
-            logger.info('Damping factor (ETA) = exp')
+            logger.info("Damping factor (ETA) = exp")
         else:
-            self.eta = float(self.topydict['ETA']) * np.ones(self.desvars.shape)
-            logger.info('Damping factor (ETA) = %3.2f' % (self.eta.mean()))
+            self.eta = float(self.topydict["ETA"]) * np.ones(self.desvars.shape)
+
+            logger.info("Damping factor (ETA) = %3.2f" % (self.eta.mean()))
+
 
         try:
-
-            self.approx = self.topydict['APPROX'].lower()
-
+            self.approx = self.topydict["APPROX"].lower()
         except KeyError:
             self.approx = None
-        if self.approx == 'dquad':
-            logger.info('Using diagonal quadratic approximation (APPROX = dquad)')
+        if self.approx == "dquad":
+            logger.info("Using diagonal quadratic approximation (APPROX = dquad)")
         # (5) Set passive elements:
-        self.pasv = self.topydict['PASV_ELEM']
+        self.pasv = self.topydict["PASV_ELEM"]
         if self.pasv.any():
-            logger.info('Passive elements (PASV_ELEM) specified')
+            logger.info("Passive elements (PASV_ELEM) specified")
         else:
-            logger.info('No passive elements (PASV_ELEM) specified')
+            logger.info("No passive elements (PASV_ELEM) specified")
         # (6) Set active elements:
-        self.actv = self.topydict['ACTV_ELEM']
+        self.actv = self.topydict["ACTV_ELEM"]
         if self.actv.any():
-            logger.info('Active elements (ACTV_ELEM) specified')
+            logger.info("Active elements (ACTV_ELEM) specified")
         else:
-            logger.info('No active elements (ACTV_ELEM) specified')
+            logger.info("No active elements (ACTV_ELEM) specified")
 
         # Set parameters for compliant mechanism synthesis, if they exist:
-        if self.probtype == 'mech':
-            if self.topydict['LOAD_DOF_OUT'].any() and \
-            self.topydict['LOAD_VAL_OUT'].any():
-                self.loaddofout = self.topydict['LOAD_DOF_OUT']
-                self.loadvalout = self.topydict['LOAD_VAL_OUT']
+        if self.probtype == "mech":
+            if (
+                self.topydict["LOAD_DOF_OUT"].any()
+                and self.topydict["LOAD_VAL_OUT"].any()
+            ):
+                self.loaddofout = self.topydict["LOAD_DOF_OUT"]
+                self.loadvalout = self.topydict["LOAD_VAL_OUT"]
             else:
-                raise Exception('Not enough input data for mechanism \
-                    synthesis!')
+                raise Exception(
+                    "Not enough input data for mechanism \
+                    synthesis!"
+                )
 
             self.rout = np.zeros_like(self.alldof).astype(float)
             self.rout[self.loaddofout] = self.loadvalout
@@ -289,7 +330,7 @@ class TopologyTrad:
 
     def fea(self):
         """
-        Performs a Finite Element Analysis given the updated global stiffness
+        Perform a Finite Element Analysis given the updated global stiffness
         matrix [K] and the load vector {r}, both of which must be in the
         modified state, i.e., [K] and {r} must represent the unconstrained
         system of equations. Return the global displacement vector {d} as a
@@ -433,7 +474,7 @@ class TopologyTrad:
 
         """
         if not self.topydict:
-            raise Exception('You must first load a TPD file!')
+            raise Exception("You must first load a TPD file!")
         tmp = np.zeros_like(self.df)
         rmin = int(np.floor(self.filtrad))
         if self.nelz == 0:
@@ -444,35 +485,45 @@ class TopologyTrad:
                 for j in range(self.nely):
                     vmin = np.maximum(j - rmin - 1, 0)
                     vmax = np.minimum(j + rmin + 2, self.nely + 1)
-                    u = U[umin: umax, vmin: vmax]
-                    v = V[umin: umax, vmin: vmax]
+                    u = U[umin:umax, vmin:vmax]
+                    v = V[umin:umax, vmin:vmax]
                     dist = self.filtrad - np.sqrt((i - u) ** 2 + (j - v) ** 2)
-                    sumnumr = (np.maximum(0, dist) * self.desvars[v, u] *\
-                               self.df[v, u]).sum()
+                    sumnumr = (
+                        np.maximum(0, dist) * self.desvars[v, u] * self.df[v, u]
+                    ).sum()
                     sumconv = np.maximum(0, dist).sum()
                     tmp[j, i] = sumnumr / (sumconv * self.desvars[j, i])
         else:
             rmin3 = rmin
             U, V, W = np.indices((self.nelx, self.nely, self.nelz))
             for i in range(self.nelx):
-                umin, umax = np.maximum(i - rmin - 1, 0),\
-                             np.minimum(i + rmin + 2, self.nelx + 1)
+                umin, umax = (
+                    np.maximum(i - rmin - 1, 0),
+                    np.minimum(i + rmin + 2, self.nelx + 1),
+                )
                 for j in range(self.nely):
-                    vmin, vmax = np.maximum(j - rmin - 1, 0),\
-                                 np.minimum(j + rmin + 2, self.nely + 1)
+                    vmin, vmax = (
+                        np.maximum(j - rmin - 1, 0),
+                        np.minimum(j + rmin + 2, self.nely + 1),
+                    )
                     for k in range(self.nelz):
-                        wmin, wmax = np.maximum(k - rmin3 - 1, 0),\
-                                     np.minimum(k + rmin3 + 2, self.nelz + 1)
+                        wmin, wmax = (
+                            np.maximum(k - rmin3 - 1, 0),
+                            np.minimum(k + rmin3 + 2, self.nelz + 1),
+                        )
                         u = U[umin:umax, vmin:vmax, wmin:wmax]
                         v = V[umin:umax, vmin:vmax, wmin:wmax]
                         w = W[umin:umax, vmin:vmax, wmin:wmax]
-                        dist = self.filtrad - np.sqrt((i - u) ** 2 + (j - v) **\
-                               2 + (k - w) ** 2)
-                        sumnumr = (np.maximum(0, dist) * self.desvars[w, v, u] *\
-                                  self.df[w, v, u]).sum()
+                        dist = self.filtrad - np.sqrt(
+                            (i - u) ** 2 + (j - v) ** 2 + (k - w) ** 2
+                        )
+                        sumnumr = (
+                            np.maximum(0, dist)
+                            * self.desvars[w, v, u]
+                            * self.df[w, v, u]
+                        ).sum()
                         sumconv = np.maximum(0, dist).sum()
-                        tmp[k, j, i] = sumnumr/(sumconv *\
-                        self.desvars[k, j, i])
+                        tmp[k, j, i] = sumnumr / (sumconv * self.desvars[k, j, i])
 
         self.df = tmp
 
@@ -488,32 +539,32 @@ class TopologyTrad:
 
         """
         if not self.topydict:
-            raise Exception('You must first load a TPD file!')
+            raise Exception("You must first load a TPD file!")
         tmp = self.df.copy()
-        self.objfval  = 0.0 #  Objective function value
+        self.objfval = 0.0  #  Objective function value
 
         # Prepare Supporting Variables
-        if self.nelz == 0: #  2D problem
+        if self.nelz == 0:  #  2D problem
 
             Y, X = np.indices((self.nely, self.nelx))
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1,1), axis=1)
             e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (Y + X * (nely + 1))", global_dict={"dofpn":self.dofpn, "nely":self.nely})
             Qe = self.d[e2sdofmap]
-            QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
+            QeK = np.tensordot(Qe, self.Ke, axes=(0, 0))
             Qe_T = np.swapaxes(Qe, 2, 1).T
-            QeKQe = np.einsum('mnk,mnk->mn', QeK, Qe_T)
+            QeKQe = np.einsum("mnk,mnk->mn", QeK, Qe_T)
 
-        else: #  3D problem
+        else:  #  3D problem
 
             Z, Y, X = np.indices((self.nelz, self.nely, self.nelx))
-            X *= (self.nely + 1)
+            X *= self.nely + 1
             Z *= (self.nelx + 1) * (self.nely + 1)
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1, 1, 1), axis=1)
             e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (X + Y + Z)", global_dict={"dofpn":self.dofpn})
             Qe = self.d[e2sdofmap]
-            QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
+            QeK = np.tensordot(Qe, self.Ke, axes=(0, 0))
             Qe_T = np.swapaxes(Qe.T, 2, 0)
-            QeKQe = np.einsum('klmn,klmn->klm', QeK, Qe_T)
+            QeKQe = np.einsum("klmn,klmn->klm", QeK, Qe_T)
 
         # Update TMP
         if self.probtype == 'comp':
@@ -532,15 +583,13 @@ class TopologyTrad:
             
             if self.nelz == 0:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap], 2, 1).T
-                op = np.einsum('mnk,mnk->mn', QeK, QeOut_T)
+                op = np.einsum("mnk,mnk->mn", QeK, QeOut_T)
             else:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap].T, 2, 0)
-                op = np.einsum('klmn,klmn->klm', QeK, QeOut_T)
+                op = np.einsum("klmn,klmn->klm", QeK, QeOut_T)
             tmp *= op
 
-
         self.df = tmp
-
 
     def update_desvars_oc(self):
         """
@@ -555,7 +604,7 @@ class TopologyTrad:
 
         """
         if not self.topydict:
-            raise Exception('You must first load a TPD file!')
+            raise Exception("You must first load a TPD file!")
         # 'p' stays constant for a specified number of iterations from start.
         # 'p' is incremented, but not more than the maximum allowable value.
         # If continuation parameters are not specified in the input file, 'p'
@@ -575,11 +624,15 @@ class TopologyTrad:
 
         # Exponential approximation of eta (damping factor):
         if self.itercount > 1:
-            if self.topydict['ETA'] == 'exp': #  Check TPD specified value
+
+            if self.topydict["ETA"] == "exp":  #  Check TPD specified value
                 mask = np.equal(self.desvarsold / self.desvars, 1)
-                self.a = 1 + np.log2(np.abs(self.dfold / self.df)) / \
-                np.log2(self.desvarsold / self.desvars + mask) + \
-                mask * (self.a - 1)
+                self.a = (
+                    1
+                    + np.log2(np.abs(self.dfold / self.df))
+                    / np.log2(self.desvarsold / self.desvars + mask)
+                    + mask * (self.a - 1)
+                )
                 self.a = np.clip(self.a, A_LOW, A_UPP)
                 self.eta = 1 / (1 - self.a)
 
@@ -587,7 +640,7 @@ class TopologyTrad:
         self.desvarsold = self.desvars.copy()
 
         # Change move limit for compliant mechanism synthesis:
-        if self.probtype == 'mech':
+        if self.probtype == "mech":
             move = 0.1
         else:
             move = 0.2
@@ -596,32 +649,78 @@ class TopologyTrad:
         dims = self.desvars.shape
         while (lam2 - lam1) / (lam2 + lam1) > 1e-8 and lam2 > 1e-40:
             lammid = 0.5 * (lam1 + lam2)
-            if self.probtype == 'mech':
-                if self.approx == 'dquad':
-                    curv = - 1 / (self.eta * self.desvars) * self.df
-                    beta = np.maximum(self.desvars-(self.df + lammid)/curv, VOID)
+            if self.probtype == "mech":
+                if self.approx == "dquad":
+                    curv = -1 / (self.eta * self.desvars) * self.df
+                    beta = np.maximum(self.desvars - (self.df + lammid) / curv, VOID)
                     move_upper = np.minimum(move, self.desvars / 3)
-                    desvars = np.maximum(VOID, np.maximum((self.desvars - move),\
-                    np.minimum(SOLID,  np.minimum((self.desvars + move), \
-                    (self.desvars * np.maximum(1e-10, \
-                    (-self.df / lammid))**self.eta)**self.q))))
+                    desvars = np.maximum(
+                        VOID,
+                        np.maximum(
+                            (self.desvars - move),
+                            np.minimum(
+                                SOLID,
+                                np.minimum(
+                                    (self.desvars + move),
+                                    (
+                                        self.desvars
+                                        * np.maximum(1e-10, (-self.df / lammid))
+                                        ** self.eta
+                                    )
+                                    ** self.q,
+                                ),
+                            ),
+                        ),
+                    )
                 else:  # reciprocal or exponential
-                    desvars = np.maximum(VOID, np.maximum((self.desvars - move),\
-                    np.minimum(SOLID,  np.minimum((self.desvars + move), \
-                    (self.desvars * np.maximum(1e-10, \
-                    (-self.df / lammid))**self.eta)**self.q))))
+                    desvars = np.maximum(
+                        VOID,
+                        np.maximum(
+                            (self.desvars - move),
+                            np.minimum(
+                                SOLID,
+                                np.minimum(
+                                    (self.desvars + move),
+                                    (
+                                        self.desvars
+                                        * np.maximum(1e-10, (-self.df / lammid))
+                                        ** self.eta
+                                    )
+                                    ** self.q,
+                                ),
+                            ),
+                        ),
+                    )
             else:  # compliance or heat
-                if self.approx == 'dquad':
-                    curv = - 1 / (self.eta * self.desvars) * self.df
-                    beta = np.maximum(self.desvars-(self.df + lammid)/curv, VOID)
+                if self.approx == "dquad":
+                    curv = -1 / (self.eta * self.desvars) * self.df
+                    beta = np.maximum(self.desvars - (self.df + lammid) / curv, VOID)
                     move_upper = np.minimum(move, self.desvars / 3)
-                    desvars = np.maximum(VOID, np.maximum((self.desvars - move),\
-                    np.minimum(SOLID,  np.minimum((self.desvars + move_upper), \
-                    beta**self.q))))
+                    desvars = np.maximum(
+                        VOID,
+                        np.maximum(
+                            (self.desvars - move),
+                            np.minimum(
+                                SOLID,
+                                np.minimum((self.desvars + move_upper), beta ** self.q),
+                            ),
+                        ),
+                    )
                 else:  # reciprocal or exponential
-                    desvars = np.maximum(VOID, np.maximum((self.desvars - move),\
-                    np.minimum(SOLID,  np.minimum((self.desvars + move), \
-                    (self.desvars * (-self.df / lammid)**self.eta)**self.q))))
+                    desvars = np.maximum(
+                        VOID,
+                        np.maximum(
+                            (self.desvars - move),
+                            np.minimum(
+                                SOLID,
+                                np.minimum(
+                                    (self.desvars + move),
+                                    (self.desvars * (-self.df / lammid) ** self.eta)
+                                    ** self.q,
+                                ),
+                            ),
+                        ),
+                    )
 
             # Check for passive and active elements, modify updated x:
             if self.pasv.any() or self.actv.any():
@@ -631,19 +730,19 @@ class TopologyTrad:
                     y, x = dims
                     for j in range(x):
                         for k in range(y):
-                            idx.append(k*x + j)
+                            idx.append(k * x + j)
                 else:
                     z, y, x = dims
                     for i in range(z):
                         for j in range(x):
                             for k in range(y):
-                                idx.append(k*x + j + i*x*y)
+                                idx.append(k * x + j + i * x * y)
                 if self.pasv.any():
-                    pasv = np.take(idx, self.pasv) #  new indices
-                    np.put(flatx, pasv, VOID) #  = zero density
+                    pasv = np.take(idx, self.pasv)  #  new indices
+                    np.put(flatx, pasv, VOID)  #  = zero density
                 if self.actv.any():
-                    actv = np.take(idx, self.actv) #  new indices
-                    np.put(flatx, actv, SOLID) #  = solid
+                    actv = np.take(idx, self.actv)  #  new indices
+                    np.put(flatx, actv, SOLID)  #  = solid
                 desvars = flatx.reshape(dims)
 
             if self.nelz == 0:
@@ -652,8 +751,7 @@ class TopologyTrad:
                 else:
                     lam2 = lammid
             else:
-                if desvars.sum() - self.nelx * self.nely * self.nelz *\
-                self.volfrac > 0:
+                if desvars.sum() - self.nelx * self.nely * self.nelz * self.volfrac > 0:
                     lam1 = lammid
                 else:
                     lam2 = lammid
@@ -672,32 +770,19 @@ class TopologyTrad:
     # ===================================
     # === Private methods and helpers ===
     # ===================================
-    def _updateK(self, K):
+    def _updateK(self, K: lil_matrix) -> lil_matrix:
         """
-        Update the global stiffness matrix by looking at each element's
-        contribution i.t.o. design domain density and the penalisation factor.
-        Return unconstrained stiffness matrix.
+        Update the global stiffness matrix by looking at each element's contribution i.t.o. design domain density and the penalisation factor.
 
+        :returns: unconstrained stiffness matrix.
         """
-        ########################################################################
-        ## Assembly of global stiffnes matrix as sum of local stiffnes matrixes
-        ## ToDo: betterway of assembly, this loop must be parallized for speed 
-        ##       improvements
-        ##
-        ########################################################################
-        ## assembly approach from:
-        ## http://milamin.sourceforge.net/technical-notes/sparse-matrix-assembly
-        ##
-        data  = []
-        i_vec = []
-        j_vec = []
-        
-        if self.nelz == 0: #  2D problem
+        if self.nelz == 0:  #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
-                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                    (ely + elx * (self.nely + 1))
-                    if self.probtype == 'comp' or self.probtype == 'mech':
+                    e2sdofmap = self.e2sdofmapi + self.dofpn * (
+                        ely + elx * (self.nely + 1)
+                    )
+                    if self.probtype == "comp" or self.probtype == "mech":
                         updatedKe = self.desvars[ely, elx] ** self.p * self.Ke
                     elif self.probtype == 'heat':
                         updatedKe = (self.void + (1 - self.void) * \

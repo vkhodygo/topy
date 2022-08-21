@@ -12,6 +12,13 @@ from topy import parser
 from mpi4py import MPI
 from mumps import DMumpsContext
 
+parser = argparse.ArgumentParser(description="Optimize a TPD file.")
+parser.add_argument("filename", type=str, help="the path to the TPD file")
+parser.add_argument(
+    "--vtk-format",
+    default="binary",
+    help='["binary"|"ascii"]: specify the format for VTK output files',
+)
 
 def optimise(fname):
     comm = MPI.COMM_WORLD
