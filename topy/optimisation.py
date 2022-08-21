@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 __all__ = ['optimise']
 
-def optimise(topology, save=True, dir='./iterations'):
+def optimise(topology, save=True, dir='./iterations', apikey=''):
     # type: (Topology, bool, str) -> None
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()

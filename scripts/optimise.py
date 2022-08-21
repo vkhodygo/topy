@@ -1,9 +1,11 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Author: William Hunter, Tarcísio L. de Oliveira
 # This script handles both number of iterations and change stop criteria runs
 
 # Import required modules:
+import signal
 from sys import argv
 import topy
 from topy import parser
@@ -52,5 +54,6 @@ def optimise(fname):
     topy.optimise(t)
     
 if __name__ == '__main__':
-    optimise(argv[1])
+
+    optimise(argv[1], argv[2], argv[3])
 

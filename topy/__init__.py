@@ -1,4 +1,4 @@
-﻿"""
+"""
 # ==============================================================================
 # ToPy -- Topology optimization with Python.
 # Copyright (C) 2012, 2015, 2016, 2017 William Hunter.

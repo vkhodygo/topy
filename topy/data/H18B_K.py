@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Creates the stiffness matrix as requested, using the material properties 
 # provided in the TPD file (for v2020 files).
@@ -9,6 +10,7 @@
 # =============================================================================
 """
 from __future__ import division
+from __future__ import print_function
 
 import os
 
@@ -16,6 +18,9 @@ from sympy import symbols, Matrix, diff, integrate, zeros, eye
 from numpy import abs, array, transpose, dot
 from numpy.linalg import inv
 
+
+from .matlcons import *
+from ..helper_functions import my_map
 from ..utils import get_logger
 
 logger = get_logger(__name__)
@@ -49,18 +54,20 @@ def create_K(_L, _E, _nu, _k, _t):
     N8 = (_a - x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
 
     # Create strain-displacement matrix B:
-    B0 = tuple(map(diff, [N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0, 0,\
-                    N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0, 0], xlist))
-    B1 = tuple(map(diff, [0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0,\
-                    0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0], ylist))
-    B2 = tuple(map(diff, [0, 0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4,\
-                    0, 0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8], zlist))
-    B3 = tuple(map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
-                    N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], yxlist))
-    B4 = tuple(map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
-                    N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zylist))
-    B5 = tuple(map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
-                    N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zxlist))
+
+    B0 = my_map(diff, [N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0, 0,\
+                       N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0, 0], xlist)
+    B1 = my_map(diff, [0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4, 0,\
+                       0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8, 0], ylist)
+    B2 = my_map(diff, [0, 0, N1, 0, 0, N2, 0, 0, N3, 0, 0, N4,\
+                       0, 0, N5, 0, 0, N6, 0, 0, N7, 0, 0, N8], zlist)
+    B3 = my_map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
+                       N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], yxlist)
+    B4 = my_map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
+                       N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zylist)
+    B5 = my_map(diff, [N1, N1, N1, N2, N2, N2, N3, N3, N3, N4, N4, N4,\
+                       N5, N5, N5, N6, N6, N6, N7, N7, N7, N8, N8, N8], zxlist)
+
     B = Matrix([B0, B1, B2, B3, B4, B5])
 
     # Create constitutive (material property) matrix:
@@ -105,5 +112,8 @@ def create_K(_L, _E, _nu, _k, _t):
     # Return result:
     logger.info('Created stiffness matrix.')
     return K, B, C
+
+    print('Created {0} (stiffness matrix).'.format(fname))
+
 
 # EOF H18B_K.py

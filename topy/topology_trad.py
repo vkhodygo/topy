@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
 # conditions. Data is read from an input file, see 'examples' directory.
@@ -9,8 +10,9 @@
 # Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
-import os
 
+from __future__ import division
+#from string import lower
 import numpy as np
 import numexpr as ne
 
@@ -24,13 +26,14 @@ from .utils import get_logger
 from .parser import tpd_file2dict, config2dict
 from .visualisation import *
 
+from .helper_functions import identity_minus_rows, update_add_mask_sym
+
 logger = get_logger(__name__)
 __all__ = ['TopologyTrad']
 
 
 MAX_ITERS = 250
 
-SOLID, VOID = 1.000, 0.001 #  Upper and lower bound value for design variables
 KDATUM = 0.1 #  Reference stiffness value of springs for mechanism synthesis
 
 # Constants for exponential approximation:
@@ -47,7 +50,7 @@ class TopologyTrad:
     values. Data is read from an input file (see 'examples' folder).
 
     """
-    def __init__(self, config=None, topydict={}, pcount=0, 
+    def __init__(self, config=None, topydict={}, pcount=0,
                  qcount=0, itercount=0, change=1, svtfrac=None):
         self.pcount = pcount #  Counter for continuation of p
         self.qcount = qcount #  Counter for continuation of q for GSF
@@ -240,7 +243,9 @@ class TopologyTrad:
             logger.info('Damping factor (ETA) = %3.2f' % (self.eta.mean()))
 
         try:
+
             self.approx = self.topydict['APPROX'].lower()
+
         except KeyError:
             self.approx = None
         if self.approx == 'dquad':
@@ -474,7 +479,7 @@ class TopologyTrad:
     def sens_analysis(self):
         """
         Determine the objective function value and perform sensitivity analysis
-        (find the derivatives of objective function). 
+        (find the derivatives of objective function).
 
         EXAMPLES:
             >>> t.sens_analysis()
@@ -486,10 +491,10 @@ class TopologyTrad:
             raise Exception('You must first load a TPD file!')
         tmp = self.df.copy()
         self.objfval  = 0.0 #  Objective function value
-        
+
         # Prepare Supporting Variables
         if self.nelz == 0: #  2D problem
-    
+
             Y, X = np.indices((self.nely, self.nelx))
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1,1), axis=1)
             e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (Y + X * (nely + 1))", global_dict={"dofpn":self.dofpn, "nely":self.nely})
@@ -497,9 +502,9 @@ class TopologyTrad:
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe, 2, 1).T
             QeKQe = np.einsum('mnk,mnk->mn', QeK, Qe_T)
-            
+
         else: #  3D problem
-            
+
             Z, Y, X = np.indices((self.nelz, self.nely, self.nelx))
             X *= (self.nely + 1)
             Z *= (self.nelx + 1) * (self.nely + 1)
@@ -509,7 +514,7 @@ class TopologyTrad:
             QeK = np.tensordot(Qe, self.Ke, axes=(0,0))
             Qe_T = np.swapaxes(Qe.T, 2, 0)
             QeKQe = np.einsum('klmn,klmn->klm', QeK, Qe_T)
-        
+
         # Update TMP
         if self.probtype == 'comp':
             self.objfval += ne.evaluate("sum((desvars ** p) * QeKQe)", global_dict={"desvars":self.desvars, "p":self.p})
@@ -532,8 +537,8 @@ class TopologyTrad:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap].T, 2, 0)
                 op = np.einsum('klmn,klmn->klm', QeK, QeOut_T)
             tmp *= op
-            
-            
+
+
         self.df = tmp
 
 
@@ -659,9 +664,9 @@ class TopologyTrad:
         # Change in design variables:
         self.change = (np.abs(self.desvars - self.desvarsold)).max()
 
-        # Solid-void fraction:
-        nr_s = self.desvars.flatten().tolist().count(SOLID)
-        nr_v = self.desvars.flatten().tolist().count(VOID)
+        # Solid-self.void fraction:
+        nr_s = self.desvars.flatten().tolist().count(self.solid)
+        nr_v = self.desvars.flatten().tolist().count(self.void)
         self.svtfrac = (nr_s + nr_v) / self.desvars.size
 
     # ===================================
@@ -674,6 +679,19 @@ class TopologyTrad:
         Return unconstrained stiffness matrix.
 
         """
+        ########################################################################
+        ## Assembly of global stiffnes matrix as sum of local stiffnes matrixes
+        ## ToDo: betterway of assembly, this loop must be parallized for speed 
+        ##       improvements
+        ##
+        ########################################################################
+        ## assembly approach from:
+        ## http://milamin.sourceforge.net/technical-notes/sparse-matrix-assembly
+        ##
+        data  = []
+        i_vec = []
+        j_vec = []
+        
         if self.nelz == 0: #  2D problem
             for elx in range(self.nelx):
                 for ely in range(self.nely):
@@ -682,7 +700,7 @@ class TopologyTrad:
                     if self.probtype == 'comp' or self.probtype == 'mech':
                         updatedKe = self.desvars[ely, elx] ** self.p * self.Ke
                     elif self.probtype == 'heat':
-                        updatedKe = (VOID + (1 - VOID) * \
+                        updatedKe = (self.void + (1 - self.void) * \
                         self.desvars[ely, elx] ** self.p) * self.Ke
                     K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
         else: #  3D problem
@@ -696,7 +714,7 @@ class TopologyTrad:
                             updatedKe = self.desvars[elz, ely, elx] ** \
                             self.p * self.Ke
                         elif self.probtype == 'heat':
-                            updatedKe = (VOID + (1 - VOID) * \
+                            updatedKe = (self.void + (1 - self.void) * \
                             self.desvars[elz, ely, elx] ** self.p) * self.Ke
                         K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 

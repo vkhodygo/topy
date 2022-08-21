@@ -1,4 +1,5 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 # =============================================================================
 # Creates the stiffness matrix as requested, using the material properties 
 # provided in the TPD file (for v2020 files).
@@ -9,6 +10,7 @@
 # =============================================================================
 """
 from __future__ import division
+from __future__ import print_function
 
 import os
 
@@ -16,6 +18,7 @@ from sympy import symbols, Matrix, diff, integrate, zeros
 from numpy import abs, array
 
 from ..utils import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -38,8 +41,10 @@ def create_K(_L, _E, _nu, _k, _t):
     N4 = (_a - x) * (_b + y) / (4 * _a * _b)
 
     # Create strain-displacement matrix B:
-    B0 = tuple(map(diff, [N1, N2, N3, N4], xlist))
-    B1 = tuple(map(diff, [N1, N2, N3, N4], ylist))
+
+    B0 = my_map(diff, [N1, N2, N3, N4], xlist)
+    B1 = my_map(diff, [N1, N2, N3, N4], ylist)
+
     B = Matrix([B0, B1])
 
     # Create conductivity matrix:
@@ -62,5 +67,8 @@ def create_K(_L, _E, _nu, _k, _t):
     # Return result:
     logger.info('Created stiffness matrix.')
     return K, B, C
+
+    print('Created {0} (stiffness matrix).'.format(fname))
+
 
 # EOF Q4T_K.py
