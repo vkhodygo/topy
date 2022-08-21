@@ -1,60 +1,161 @@
-![pytest](https://github.com/mlaradji/topy/workflows/pytest/badge.svg)
-
 # ToPy
 <div align="center">
 	<img src="./imgsrc/topy_logo3d.png" width="400">
 </div>
 
-## What is ToPy?
-ToPy is short for **t**opology **o**ptimization using **Py**thon. It is a lightweight framework for Python that can solve one of three types of topology optimisation problems: 
-1. minimum compliance (same as maximum stiffness),
-2. heat conduction or
-3. mechanism design (synthesis).
+ToPy is a lightweight topology optimization framework for Python that can solve
+compliance (stiffness), mechanism synthesis and heat conduction problems in 2D and 3D.
+
+ToPy was originally created by [William Hunter](https://github.com/williamhunter/topy) for his Master's dissertation, in 2009. This fork was then created in 2020 so I could use it as a foundation to test an experimental stress-based sizing algorithm for topology optimization for my own Master's dissertation. I have both implemented the entire algorithm I developed and also upgraded the code for Python 3 and implemented whichever optimizations I could.
+
+As Mr. Hunter actually did most of the work by fully implementing the topology optimization SIMP algorithm (and did a great job at it, I might add), I made sure to make the code backwards compatible. Not to mention that it also helps comparing both algorithms.
+
+You can check Mr. Hunter's dissertation [here](http://hdl.handle.net/10019.1/2648).
+
+Please refer to the [ToPy Wiki](https://github.com/TarcisioLOliveira/topy/wiki) for further information.
 
 ## Example of a ToPy result
-An [example TPD file and solution/result](https://github.com/williamhunter/ToPy/wiki/Examples-of-ToPy-results)
+An [example TPD file and solution/result](https://github.com/TarcisioLOliveira/topy/wiki/Examples-of-ToPy-results)
 
 ## Installation
-**NOTE**: I've added a 0.4.1 release, which is older then the master branch, but will get you up and running with Python 2 and
-Pysparse if you're willing to use the Anaconda Python distribution
-
-Once you've downloaded the dependencies (see the [INSTALL](https://github.com/williamhunter/topy/blob/master/INSTALL.md)
+Once you've downloaded the dependencies (see the [INSTALL](https://github.com/TarcisioLOliveira/topy/blob/master/INSTALL.md)
 file) all you need to do is the following:
 
-Download the latest **stable release** from here: https://github.com/williamhunter/topy/releases/latest
+Download the latest **stable release** from here: https://github.com/TarcisioLOliveira/topy/releases/latest
 
 ToPy solves the defined problem to obtain a 2D (or 3D, depending on the input file) checker-free black-white (in 2D) or solid-void (in 3D) solution. The result is
 1. an optimally stiff structure for minimum compliance (maximum stiffness) problems,
 2. an optimal distribution of two materials for heat conduction problems and
 3. an optimal distribution of material for efficient mobility.
 
-The 2D results are PNG (or any format that Matplotlib can save) files and the 3D results are legacy VTK files.
+```bash
+cd topy/topy
+python setup.py install
+```
 
+If you opted to use a virtual environment, make sure it is activated before and 
+while you use ToPy.
 
-### ToPy and Python 3
-ToPy is fairly old. I started working on it in 2005 and finished it around 2009, so that implies that the stable release only 
-works with Python 2. You can however pull the latest "unstable" version, which should work with Python 3 (thanks to the
-efforts of other people).
+## Getting started
+The main classes of **ToPy** are 'TopologyGen' and 'TopologyTrad'.
+They define the main constraints,
+grid and parameters of optimization -- but you don't really have to bother
+yourself with this if you just want to get some results.
 
-You will also need to install [Gmsh](http://gmsh.info).
+### There are two ways of defining a problem
+1. **TPD file**: You define the problem with keywords
+(see [Help](https://github.com/TarcisioLOliveira/topy/wiki/Help)) in a simple text file and solve via the command line. The text file must have the extension `.tpd`
+2. **Config dictionary**: This is similar to the TPD file approach, however,
+you define the problem directly in a Python file. While it still works, I wouldn't
+recommend it unless you are familiar with MPI.
 
-Once you've downloaded the dependencies, all you need to do is the following:
+### TPD (**T**oPy **P**roblem **D**efinition) file
+There is a minimal set of parameters which is required for successful definition of a ToPy problem:
+```
+[ToPy Problem Definition File v2020]
+
+TO_TYPE    : trad
+PROB_TYPE  : comp
+PROB_NAME  : mbb_beam_minimal
+ETA        : 0.5
+DOF_PN     : 2
+VOL_FRAC   : 0.5
+FILT_RAD   : 1.5
+P_FAC      : 3
+ELEM_K     : Q4
+NUM_ELEM_X : 60
+NUM_ELEM_Y : 20
+NUM_ELEM_Z : 0
+NUM_ITER   : 10
+FXTR_NODE_X: 1|21
+FXTR_NODE_Y: 1281
+LOAD_NODE_Y: 1
+LOAD_VALU_Y: -1
+```
+To successfully use the new algorithm implemented, or take advantage of the stress
+calculations for analysis, then the minimal set becomes:
+```
+[ToPy Problem Definition File v2020]
+TO_TYPE    : gen         # or 'trad'
+
+ELEM_E:      186         # GPa
+ELEM_NU:     0.29
+ELEM_TC:     51.9        # W/(m*K)
+ELEM_L:      25          # mm (half-length of element)
+THICKNESS:   50	         # mm
+NORMAL_MAX : 100         # MPa
+SHEAR_MAX  : 100         # MPa
+
+PROB_TYPE  : comp
+PROB_NAME  : mbb_beam_minimal
+ETA        : 0.5
+DOF_PN     : 2
+VOL_FRAC   : 0.5
+FILT_RAD   : 1.5
+P_FAC      : 3
+ELEM_K     : Q4
+NUM_ELEM_X : 60
+NUM_ELEM_Y : 20
+NUM_ELEM_Z : 0
+NUM_ITER   : 10
+FXTR_NODE_X: 1|21
+FXTR_NODE_Y: 1281
+LOAD_NODE_Y: 1
+LOAD_VALU_Y: -1
+```
+
+Be aware that the new algorithm is only partially implemented for heat conduction,
+and is not present for mechanism synthesis. Heat condunction also does not lead
+to stress calculations (as it does not have a clear analogous concept).
+
+You can read more about successful problem definition [here](https://github.com/TarcisioLOliveira/topy/tree/master/templates).
+
+When the TPD file is defined, then the rest is simple. You can use the command line solution:
 
 ```bash
-$ git clone https://github.com/thebeachlab/topy.git
-$ cd topy/topy
-$ (sudo) python setup.py install
+$ python topy/scripts/optimise.py <filename>.tpd
 ```
-If there aren't any errors, then ToPy is installed. Congratulations!
 
-## Documentation
-Please refer to the [ToPy Docs](docs/README.md) for further information.
+Or, for multiprocessing FEA (in this case, 2 processes): 
 
-## Limitations
-  * ToPy only works with regular square (for 2D)  and cubic (for 3D) meshes. Your mesh will therefore consist of perfectly square (for 2D) or perfectly cubic (for 3D) elements.
-  * No GUI for defining problems
-  * No CAD interface (although you can save the 3D files as STL files via ParaView)
+```bash
+$ mpirun -n 2 python3 -m mpi4py optimise.py <filename>.tpd
+```
 
+### Config dictionary
+First you have to define a config dictionary (note the similarity with a TPD
+file, especially the keywords):
+
+```Python
+config = {
+    'TO_TYPE': trad,
+    'DOF_PN': 2,
+    'ELEM_K': 'Q4',
+    'ETA': '0.5',
+    'FILT_RAD': 1.5,
+    'FXTR_NODE_X': range(1, 22),
+    'FXTR_NODE_Y': 1281,
+    'LOAD_NODE_Y': 1,
+    'LOAD_VALU_Y': -1,
+    'NUM_ELEM_X': 60,
+    'NUM_ELEM_Y': 20,
+    'NUM_ELEM_Z': 0,
+    'NUM_ITER': 94,
+    'PROB_NAME': 'beam_2d_reci',
+    'PROB_TYPE': 'comp',
+    'P_FAC': 3.0,
+    'VOL_FRAC': 0.5
+}
+```
+The requirements are the same as for the TPD file. Then do:
+
+```Python
+topology = TopologyTrad(config=config) # or TopologyGen, for 'TO_TYPE': gen
+topology.set_top_params()
+topy.optimise(t)
+```
+
+Just remember to make your code MPI aware.
 
 ### Visualization (seeing the result)
 Module `topy.visualization` allows one to save the output as a `.png` image for 2D problems or as a `.vtk` file for 3D.
@@ -72,18 +173,23 @@ convert -delay 35 *.png anim.gif
 	<img src="./imgsrc/t-piece_2d_Q4_eta04_gsf.gif" width=20%>
 </div>
 
+For 3D problems with Paraview, for example, you can visualize them with:
+```bash
+paraview <filename>.vtk
+```
+
 ## Tutorials
-[Tutorials](https://github.com/williamhunter/topy/wiki/Tutorials)
+[Tutorials](https://github.com/TarcisioLOliveira/topy/wiki/Tutorials)
 
 ## How to cite ToPy
 If you've used ToPy in your research work or find it useful in any way, please consider to cite:
 ```
-@misc{Hunter2007william,
-  author = {Hunter, William and others},
-  title = {ToPy - Topology optimization with Python},
-  year = {2017},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/williamhunter/topy}},
-  }
+@misc{TopyRepo
+    author = {de Oliveira, Tarc\'isio Ladeia and Hunter, William and others},
+    title = {ToPy - Topology optimization with Python},
+    year = {2021},
+    publisher = {GitHub},
+    journal = {GitHub repository},
+    howpublished = {\url{https://github.com/TarcisioLOliveira/topy}},
+}
 ```

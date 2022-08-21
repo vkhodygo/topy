@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 # =============================================================================
-# Write the stiffness matrix of finite element to file. The created file name
-# is equal to the string between the underscores of *this* file's name, plus a
-# 'K' extension, e.g.,
+# Creates the stiffness matrix as requested, using the material properties 
+# provided in the TPD file (for v2020 files).
 #
-#     python ELEM_K.py
-#
-# gives a file named ELEM.K in the same directory.
-#
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 from __future__ import division
@@ -25,25 +21,20 @@ from numpy.linalg import inv
 
 from .matlcons import *
 from ..helper_functions import my_map
+from ..utils import get_logger
 
 logger = get_logger(__name__)
-# Get file name:
 
-fname = __file__.split('_')[0] + '.K'
-fname = __file__[:-5] + '.K'
-print("working on filename: {0}".format(fname))
-
-try:
-    f = open(fname)
-    print('{0} (stiffness matrix) exists!'.format(fname))
-    f.close()
-except IOError:
+def create_K(_L, _E, _nu, _k, _t):
+    # Initialize variables
+    _a, _b, _c = _L, _L, _L  # element dimensions (half-lengths)
+    _G = _E / (2 * (1 + _nu))  # modulus of rigidity
+    _g = _E /  ((1 + _nu) * (1 - 2 * _nu))
 
     # SymPy symbols:
-    a, b, c, x, y, z = symbols('a b c x y z')
+    x, y, z = symbols('x y z')
     N1, N2, N3, N4 = symbols('N1 N2 N3 N4')
     N5, N6, N7, N8 = symbols('N5 N6 N7 N8')
-    E, nu, g, G = symbols('E nu g G')
     o = symbols('o') #  dummy symbol
     xlist = [x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x]
     ylist = [y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y, y]
@@ -53,14 +44,14 @@ except IOError:
     zxlist = [z, o, x, z, o, x, z, o, x, z, o, x, z, o, x, z, o, x, z, o, x, z, o, x]
 
     # Shape functions:
-    N1 = (a - x) * (b - y) * (c - z) / (8 * a * b * c)
-    N2 = (a + x) * (b - y) * (c - z) / (8 * a * b * c)
-    N3 = (a + x) * (b + y) * (c - z) / (8 * a * b * c)
-    N4 = (a - x) * (b + y) * (c - z) / (8 * a * b * c)
-    N5 = (a - x) * (b - y) * (c + z) / (8 * a * b * c)
-    N6 = (a + x) * (b - y) * (c + z) / (8 * a * b * c)
-    N7 = (a + x) * (b + y) * (c + z) / (8 * a * b * c)
-    N8 = (a - x) * (b + y) * (c + z) / (8 * a * b * c)
+    N1 = (_a - x) * (_b - y) * (_c - z) / (8 * _a * _b * _c)
+    N2 = (_a + x) * (_b - y) * (_c - z) / (8 * _a * _b * _c)
+    N3 = (_a + x) * (_b + y) * (_c - z) / (8 * _a * _b * _c)
+    N4 = (_a - x) * (_b + y) * (_c - z) / (8 * _a * _b * _c)
+    N5 = (_a - x) * (_b - y) * (_c + z) / (8 * _a * _b * _c)
+    N6 = (_a + x) * (_b - y) * (_c + z) / (8 * _a * _b * _c)
+    N7 = (_a + x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
+    N8 = (_a - x) * (_b + y) * (_c + z) / (8 * _a * _b * _c)
 
     # Create strain-displacement matrix B:
 
@@ -80,49 +71,47 @@ except IOError:
     B = Matrix([B0, B1, B2, B3, B4, B5])
 
     # Create constitutive (material property) matrix:
-    C = Matrix([[(1 - nu) * g, nu * g, nu * g, 0, 0, 0],
-                [nu * g, (1 - nu) * g, nu * g, 0, 0, 0],
-                [nu * g, nu * g, (1 - nu) * g, 0, 0, 0],
-                [0, 0, 0,                      G, 0, 0],
-                [0, 0, 0,                      0, G, 0],
-                [0, 0, 0,                      0, 0, G]])
+    C = Matrix([[(1 - _nu) * _g, _nu * _g, _nu * _g, 0, 0, 0],
+                [_nu * _g, (1 - _nu) * _g, _nu * _g, 0, 0, 0],
+                [_nu * _g, _nu * _g, (1 - _nu) * _g, 0, 0, 0],
+                [0, 0, 0,                           _G, 0, 0],
+                [0, 0, 0,                           0, _G, 0],
+                [0, 0, 0,                           0, 0, _G]])
 
     PI = eye(6)
     PH3 = Matrix([\
-    [y/b, z/c, (y*z)/(b*c), 0, 0, 0, 0, 0, 0, 0, 0, 0],\
-    [0, 0, 0, x/a, z/c, (x*z)/(a*c), 0, 0, 0, 0, 0, 0],\
-    [0, 0, 0, 0, 0, 0, x/a, y/b, (x*y)/(a*b), 0, 0, 0],\
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, z/c, 0, 0],\
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, x/a, 0],\
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, y/b]])
+    [y/_b, z/_c, (y*z)/(_b*_c), 0, 0, 0, 0, 0, 0, 0, 0, 0],\
+    [0, 0, 0, x/_a, z/_c, (x*z)/(_a*_c), 0, 0, 0, 0, 0, 0],\
+    [0, 0, 0, 0, 0, 0, x/_a, y/_b, (x*y)/(_a*_b), 0, 0, 0],\
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, z/_c, 0, 0],\
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, x/_a, 0],\
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, y/_b]])
     P = PI.row_join(PH3)
     tP = P.transpose()
     dJ = tP * B
     dH = tP * C.inv() * P
 
     # Integration:
-
-    print('SymPy is integrating: K for H18B...')
-
-    J = dJ.integrate((x, -a, a),(y, -b, b),(z, -c, c))
-    J = J.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})
-    H = dH.integrate((x, -a, a),(y, -b, b),(z, -c, c))
-    H = H.subs({a:_a, b:_b, c:_c, E:_E, nu:_nu, g:_g, G:_G})
+    logger.info('SymPy is integrating: K for H18B...')
+    J = dJ.integrate((x, -_a, _a),(y, -_b, _b),(z, -_c, _c))
+    H = dH.integrate((x, -_a, _a),(y, -_b, _b),(z, -_c, _c))
 
     # Convert SymPy Matrix to NumPy array:
-    J = array(J).astype('double')
-    iH = inv(array(H).astype('double'))
+    J = array(J, dtype='double')
+    iH = inv(array(H, dtype='double'))
 
     # Convert SymPy Matrix to NumPy array:
     # NOTE:
     # sympy.Matrix() * sympy.Matrix == numpy.dot(numpy.array(), numpy.array())
     K = dot(dot(J.transpose(), iH), J)  # use NumPy's dot for arrays, NOT '*'
+    C = array(C, dtype='double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0
 
-    # Create file:
-    K.dump(fname)
+    # Return result:
+    logger.info('Created stiffness matrix.')
+    return K, B, C
 
     print('Created {0} (stiffness matrix).'.format(fname))
 

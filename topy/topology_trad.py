@@ -3,17 +3,28 @@
 # =============================================================================
 # A class to optimise the topology of a design domain for defined boundary
 # conditions. Data is read from an input file, see 'examples' directory.
+# Uses traditional SIMP topology optimization.
 #
-# Author: William Hunter
+# Authors: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 
 from __future__ import division
 #from string import lower
 import numpy as np
-from scipy.sparse import lil_matrix
+import numexpr as ne
+
+from scipy import sparse
 from scipy.sparse import linalg
+from sympy import symbols
+from mumps import DMumpsContext
+from mpi4py import MPI
+
+from .utils import get_logger
+from .parser import tpd_file2dict, config2dict
+from .visualisation import *
 
 from . import utils
 from .parser import config2dict
@@ -22,9 +33,7 @@ from .parser import tpd_file2dict
 from .helper_functions import identity_minus_rows, update_add_mask_sym
 
 logger = get_logger(__name__)
-logger.info("Instantiated.")
-__all__ = ['Topology']
-logger = utils.get_logger(__name__)
+__all__ = ['TopologyTrad']
 
 
 __all__ = ["Topology"]
@@ -46,7 +55,7 @@ A_UPP = -1e-5  #  Upper restriction on 'a' for exponential approximation
 # =======================
 # === ToPy base class ===
 # =======================
-class Topology:
+class TopologyTrad:
     """
     A class to optimise the topology of a design domain for defined boundary
     values. Data is read from an input file (see 'examples' folder).
@@ -86,6 +95,7 @@ class Topology:
     # ======================
     def load_tpd_file(self, fname: str):
         """
+        DEPRECATED. Need to check TO_TYPE before instantiating.
         Load a ToPy problem definition (TPD) file, return a dictionary:
 
         INPUTS:
@@ -136,22 +146,24 @@ class Topology:
         # Set all the mandatory minimum amount of parameters that constitutes
         # a completely defined topology optimisation problem:
         if not self.topydict:
-            raise Exception("You must first load a TPD file!")
-        self.probtype = self.topydict["PROB_TYPE"]  #  Problem type
-        self.probname = self.topydict.get("PROB_NAME", "")  #  Problem name
-        self.volfrac = self.topydict["VOL_FRAC"]  #  Volume fraction
-        self.filtrad = self.topydict["FILT_RAD"]  #  Filter radius
-        self.p = self.topydict["P_FAC"]  #  'Standard' penalisation factor
-        self.dofpn = self.topydict["DOF_PN"]  #  DOF per node
-        self.e2sdofmapi = self.topydict["E2SDOFMAPI"]  #  Elem to structdof map
-        self.nelx = self.topydict["NUM_ELEM_X"]  #  Number of elements in X
-        self.nely = self.topydict["NUM_ELEM_Y"]  #  Number of elements in Y
-        self.nelz = self.topydict["NUM_ELEM_Z"]  #  Number of elements in Z
-        self.fixdof = self.topydict["FIX_DOF"]  #  Fixed dof vector
-        self.loaddof = self.topydict["LOAD_DOF"]  #  Loaded dof vector
-        self.loadval = self.topydict["LOAD_VAL"]  #  Loaded dof values
-        self.Ke = self.topydict["ELEM_K"]  #  Element stiffness matrix
-        self.K = self.topydict["K"]  #  Global stiffness matrix
+            raise Exception('You must first load a TPD file!')
+        self.probtype = self.topydict['PROB_TYPE'] #  Problem type
+        self.probname = self.topydict.get('PROB_NAME', '') #  Problem name
+        self.volfrac = self.topydict['VOL_FRAC'] #  Volume fraction
+        self.filtrad = self.topydict['FILT_RAD'] #  Filter radius
+        self.p = self.topydict['P_FAC'] #  'Standard' penalisation factor
+        self.dofpn = self.topydict['DOF_PN'] #  DOF per node
+        self.e2sdofmapi = self.topydict['E2SDOFMAPI'] #  Elem to structdof map
+        self.nelx = self.topydict['NUM_ELEM_X'] #  Number of elements in X
+        self.nely = self.topydict['NUM_ELEM_Y'] #  Number of elements in Y
+        self.nelz = self.topydict['NUM_ELEM_Z'] #  Number of elements in Z
+        self.fixdof = self.topydict['FIX_DOF'] #  Fixed dof vector
+        self.loaddof = self.topydict['LOAD_DOF'] #  Loaded dof vector
+        self.loadval = self.topydict['LOAD_VAL'] #  Loaded dof values
+        self.Ke = self.topydict['ELEM_K'] #  Element stiffness matrix
+        self.Be = self.topydict['ELEM_B'] #  Element strain interpolation matrix
+        self.Ce = self.topydict['ELEM_C'] #  Element linear elastic modulus matrix
+        self.K = self.topydict['K'] #  Global stiffness matrix
         if self.nelz:
             logger.info(
 
@@ -183,6 +195,19 @@ class Topology:
             )
             self.numiter = MAX_ITERS
 
+        self.stress = 0.0 # Current maximum stress
+        self.objfval = 0.0 # Objective function
+
+        # For stress calculations
+        if self.nelz == 0:
+            from sympy import lambdify
+            from sympy.abc import x, y
+            self.Bf = lambdify((x, y), self.Be.copy(), "numpy")
+        else:
+            from sympy import lambdify
+            from sympy.abc import x, y, z
+            self.Bf = lambdify((x, y, z), self.Be.copy(), "numpy")
+
         # All DOF vector and design variables arrays:
         # This needs to be recoded at some point, perhaps. I originally
         # (incorrectly) thought I could do everything just by looking at DOF
@@ -191,32 +216,33 @@ class Topology:
         if self.dofpn == 1:
             if self.nelz == 0:  #  *had to this
                 self.e2sdofmapi = self.e2sdofmapi[0:4]
-                self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
-                self.desvars = np.zeros((self.nely, self.nelx)) + self.volfrac
+                self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
+                    (self.nely + 1))
+                self.desvars = self.volfrac * np.ones((self.nely, self.nelx))
+                self.stress_mat = np.zeros((self.nely, self.nelx))
             else:
-                self.alldof = np.arange(
-                    self.dofpn * (self.nelx + 1) * (self.nely + 1) * (self.nelz + 1)
-                )
-                self.desvars = (
-                    np.zeros((self.nelz, self.nely, self.nelx)) + self.volfrac
-                )
+                self.alldof = np.arange(self.dofpn * (self.nelx + 1) * \
+                    (self.nely + 1) * (self.nelz + 1))
+                self.desvars = self.volfrac * np.ones((self.nelz, self.nely, self.nelx))
+                self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
         elif self.dofpn == 2:
             self.alldof = np.arange(self.dofpn * (self.nelx + 1) * (self.nely + 1))
-            self.desvars = np.zeros((self.nely, self.nelx)) + self.volfrac
+            self.desvars = self.volfrac * np.ones((self.nely, self.nelx))
+            self.stress_mat = np.zeros((self.nely, self.nelx))
         else:
-            self.alldof = np.arange(
-                self.dofpn * (self.nelx + 1) * (self.nely + 1) * (self.nelz + 1)
-            )
-            self.desvars = np.zeros((self.nelz, self.nely, self.nelx)) + self.volfrac
-        self.df = np.zeros_like(self.desvars)  #  Derivatives of obj. func. (array)
-        self.freedof = np.setdiff1d(self.alldof, self.fixdof)  #  Free DOF vector
-        self.r = np.zeros_like(self.alldof).astype(float)  #  Load vector
-        self.r[self.loaddof] = self.loadval  #  Assign load values at loaded dof
-        self.rfree = self.r[self.freedof]  #  Modified load vector (free dof)
-        self.d = np.zeros_like(self.r)  #  Displacement vector
-        self.dfree = np.zeros_like(self.rfree)  #  Modified load vector (free dof)
+            self.alldof = np.arange(self.dofpn * (self.nelx + 1) *\
+                (self.nely + 1) * (self.nelz + 1))
+            self.desvars = self.volfrac * np.ones((self.nelz, self.nely, self.nelx))
+            self.stress_mat = np.zeros((self.nelz, self.nely, self.nelx))
+        self.df = np.zeros_like(self.desvars) #  Derivatives of obj. func. (array)
+        self.freedof = np.setdiff1d(self.alldof, self.fixdof) #  Free DOF vector
+        self.r = np.zeros_like(self.alldof, dtype=np.double) #  Load vector
+        self.r[self.loaddof] = self.loadval #  Assign load values at loaded dof
+        self.rfree = np.asarray(self.r[self.freedof], dtype=np.double) #  Modified load vector (free dof)
+        self.d = np.zeros_like(self.r) #  Displacement vector
+        self.dfree = np.zeros_like(self.rfree) #  Modified load vector (free dof)
         # Determine which rows and columns must be deleted from global K:
-        self._rcfixed = np.where(np.in1d(self.alldof, self.fixdof), 0, 1)
+        self._rcfixed = np.where(np.in1d(self.alldof, self.fixdof), False, True)
 
         # Print this to screen, just so that the user knows what type of
         # problem is being solved:
@@ -290,21 +316,17 @@ class Topology:
 
             self.rout = np.zeros_like(self.alldof).astype(float)
             self.rout[self.loaddofout] = self.loadvalout
-            self.rfreeout = self.rout[self.freedof]
+            self.rfreeout = np.array(self.rout[self.freedof], dtype=np.double)
             self.dout = np.zeros_like(self.rout)
             self.dfreeout = np.zeros_like(self.rfreeout)
-            ksin = np.ones(self.loaddof.shape, dtype="int") * KDATUM
-            ksout = np.ones(self.loaddofout.shape, dtype="int") * KDATUM
-            maskin = np.ones(self.loaddof.shape, dtype="int")
-            maskout = np.ones(self.loaddofout.shape, dtype="int")
+            ksin = np.ones(self.loaddof.shape, dtype='int') * KDATUM
+            ksout = np.ones(self.loaddofout.shape, dtype='int') * KDATUM
             if len(ksin) > 1:
-                utils.update_add_mask_sym(self.K, [ksin, ksin], self.loaddof, maskin)
-                utils.update_add_mask_sym(
-                    self.K, [ksout, ksout], self.loaddofout, maskout
-                )
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin, ksin]), self.loaddof)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout, ksout]), self.loaddofout)
             else:
-                utils.update_add_mask_sym(self.K, [ksin], self.loaddof, maskin)
-                utils.update_add_mask_sym(self.K, [ksout], self.loaddofout, maskout)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksin]), self.loaddof)
+                self.K = self._update_add_mask_sym(self.K, np.asarray([ksout]), self.loaddofout)
 
     def fea(self):
         """
@@ -320,122 +342,125 @@ class Topology:
         See also: set_top_params
 
         """
-        if not self.topydict:
-            raise Exception("You must first load a TPD file!")
-        if self.itercount >= MAX_ITERS:
-            raise Exception("Maximum internal number of iterations exceeded!")
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
 
-        Kfree = self._updateK(self.K.copy())
+        if rank == 0:
+            if not self.topydict:
+                raise Exception('You must first load a TPD file!')
+            if self.itercount >= MAX_ITERS:
+                raise Exception('Maximum internal number of iterations exceeded!')
 
-        if self.dofpn < 3 and self.nelz == 0:  #  Direct solver
+            Kfree = self._updateK(self.K.copy())
 
-            Kfree = Kfree.tocsr()  #  Need CSR for SuperLU factorisation
-            lu = linalg.splu(Kfree)
-            lu.solve((self.rfree, self.dfree))
-            if self.probtype == "mech":
-                lu.solve((self.rfreeout, self.dfreeout))  # mechanism synthesis
-        else:  #  Iterative solver for 3D problems
-            Kfree = Kfree.to_csr()
-            preK = utils.precondition_sparse_matrix(Kfree)  # Preconditioned Kfree
-            (info, numitr, relerr) = linalg.cg(
-                Kfree, self.rfree, self.dfree, tol=1e-8, maxiter=8000, M=preK
-            )
-            if info < 0:
-                logger.error(
-                    "PySparse error: Type: {}, " "at {} iterations".format(info, numitr)
-                )
-                raise Exception("Solution for FEA did not converge.")
-            else:
-                logger.debug(
-                    "ToPy: Solution for FEA converged after "
-                    "{} iterations".format(numitr)
-                )
-            if self.probtype == "mech":  # mechanism synthesis
-                (info, numitr, relerr) = linalg.cg(
-                    Kfree, self.rfreeout, self.dfreeout, tol=1e-8, maxiter=8000, M=preK
-                )
-                if info < 0:
-                    logger.error(
-                        "PySparse error: Type: {}, "
-                        "at {} iterations".format(info, numitr)
-                    )
-                    raise Exception(
-                        "Solution for FEA of adjoint load " "case did not converge."
-                    )
+        # MUMPS with PyMumps
+        ctx = DMumpsContext(par=1, sym=1, comm=None)
+        ctx.set_icntl(6, 7)
+        ctx.set_silent()
+        if ctx.myid == 0:
+            ctx.set_centralized_sparse(Kfree.tocoo())
 
+        ctx.run(job=4) # Analysis + Factorization
 
-        # Update displacement vectors:
-        self.d[self.freedof] = self.dfree
-        if self.probtype == "mech":  # 'adjoint' vectors
-            self.dout[self.freedof] = self.dfreeout
+        if ctx.myid == 0:
+            x = self.rfree.copy()
+            ctx.set_rhs(x) # Modified in place
+
+        ctx.run(job=3) # Solve
+
+        if ctx.myid == 0:
+            self.dfree = x
+
+        if self.probtype == 'mech':
+            if ctx.myid == 0:
+                x = self.rfreeout.copy()
+                ctx.set_rhs(x) # Modified in place
+
+            ctx.run(job=3) # Solve
+
+            if ctx.myid == 0:
+                self.dfreeout = x
+
+        ctx.destroy() # Cleanup
+
         # Increment internal iteration counter
         self.itercount += 1
 
-    def sens_analysis(self):
-        """
-        Determine the objective function value and perform sensitivity analysis
-        (find the derivatives of objective function). Return the design
-        sensitivities as a NumPy array.
+        if rank == 0:
+            # Update displacement vectors:
+            self.d[self.freedof] = self.dfree
+            if self.probtype == 'mech':  # 'adjoint' vectors
+                self.dout[self.freedof] = self.dfreeout
 
-        EXAMPLES:
-            >>> t.sens_analysis()
+            # The following part does not really make sense for heat problems
+            if self.probtype == 'heat':
+                return
 
-        See also: fea
+            _L = self.topydict['ELEM_L']
+            # Calculate strain and stress values:
+            if self.dofpn < 3 and self.nelz == 0:
+                Bl = [self.Bf(-_L, -_L), self.Bf(_L, -_L), self.Bf(-_L, _L), self.Bf(_L, _L)]
+                for _y in range(self.nely):
+                    for _x in range(self.nelx):
+                        if self.desvars[_y, _x] > 0:
+                            e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                        (_y + _x * (self.nely + 1))
+                            stressveclist = []
+                            for B in Bl:
+                                if self.probtype == 'comp':
+                                    strain_vec = np.dot(B, self.d[e2sdofmap])
+                                elif self.probtype == 'mech':
+                                    strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
 
-        """
-        if not self.topydict:
-            raise ToPyError('You must first load a TPD file!')
-        tmp = self.df.copy()
-        self.objfval  = 0.0 #  Objective function value
-        if self.nelz == 0: #  2D problem
-            for ely in xrange(self.nely):
-                for elx in xrange(self.nelx):
-                    e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                (ely + elx * (self.nely + 1))
-                    qe = self.d[e2sdofmap]
-                    qeTKeqe = dot(dot(qe, self.Ke), qe)
-                    if self.probtype == 'comp':
-                        self.objfval += (self.desvars[ely, elx] ** self.p) *\
-                        qeTKeqe
-                        tmp[ely, elx] = - self.p * self.desvars[ely, elx] **\
-                        (self.p - 1) * qeTKeqe
-                    elif self.probtype == 'heat':
-                        self.objfval += (self.void + (1 - self.void) * \
-                        self.desvars[ely, elx] ** self.p) * qeTKeqe
-                        tmp[ely, elx] = - (1 - self.void) * self.p * \
-                        self.desvars[ely, elx] ** (self.p - 1) * qeTKeqe
-                    elif self.probtype == 'mech':
-                        self.objfval = self.d[self.loaddofout]
-                        qeout = self.dout[e2sdofmap]
-                        tmp[ely, elx] = self.p * self.desvars[ely, elx]\
-                        ** (self.p - 1) * dot(dot(qe, self.Ke), qeout)
-        else: #  3D problem
-            for elz in xrange(self.nelz):
-                for ely in xrange(self.nely):
-                    for elx in xrange(self.nelx):
-                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
-                                    (ely + elx * (self.nely + 1) + elz *\
-                                    (self.nelx + 1) * (self.nely + 1))
-                        qe = self.d[e2sdofmap]
-                        qeTKeqe = dot(dot(qe, self.Ke), qe)
-                        if self.probtype == 'comp':
-                            self.objfval += (self.desvars[elz, ely, elx] **\
-                            self.p) * qeTKeqe
-                            tmp[elz, ely, elx] = - self.p * self.desvars[elz, \
-                            ely, elx] ** (self.p - 1) * qeTKeqe
-                        elif self.probtype == 'heat':
-                            self.objfval += (self.void + (1 - self.void) * \
-                            self.desvars[elz, ely, elx] ** self.p) * qeTKeqe
-                            tmp[elz, ely, elx] = - (1 - self.void) *  self.p * \
-                            self.desvars[elz, ely, elx] ** (self.p - 1) * \
-                            qeTKeqe
-                        elif self.probtype == 'mech':
-                            self.objfval = self.d[self.loaddofout].sum()
-                            qeout = self.dout[e2sdofmap]
-                            tmp[elz, ely, elx] = self.p * \
-                            self.desvars[elz, ely, elx] ** (self.p - 1) * \
-                            dot(dot(qe, self.Ke), qeout)
-        self.df = tmp
+                                stressveclist.append(np.abs((self.desvars[_y, _x] ** self.p) * np.dot(self.Ce, strain_vec)))
+                            stress_vec = np.amax(stressveclist, axis=0)
+                            self.stress_mat[_y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], 0, stress_vec[2], 0, 0)
+
+            else:
+                Bl = [self.Bf(-_L, -_L, -_L), self.Bf(-_L, _L, -_L), self.Bf(-_L, -_L, _L), self.Bf(-_L, _L, _L),
+                      self.Bf( _L, -_L, -_L), self.Bf( _L, _L, -_L), self.Bf( _L, -_L, _L), self.Bf( _L, _L, _L)]
+                for _z in range(self.nelz):
+                    for _y in range(self.nely):
+                        for _x in range(self.nelx):
+                            if self.desvars[_z, _y, _x] > 0:
+                                e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                            (_y + _x * (self.nely + 1) + _z *\
+                                            (self.nelx + 1) * (self.nely + 1))
+                                stressveclist = []
+                                for B in Bl: 
+                                    if self.probtype == 'comp':
+                                        strain_vec = np.dot(B, self.d[e2sdofmap])
+                                    elif self.probtype == 'mech':
+                                        strain_vec = np.dot(B, self.d[e2sdofmap] + self.dout[e2sdofmap])
+
+                                    stressveclist.append(np.abs((self.desvars[_z, _y, _x] ** self.p) * np.dot(self.Ce, strain_vec)))
+                                stress_vec = np.amax(stressveclist, axis=0)
+                                self.stress_mat[_z, _y, _x] = self._von_Mises(stress_vec[0], stress_vec[1], stress_vec[2], stress_vec[3], stress_vec[4], stress_vec[5])
+
+            # Maximum stress reached
+            self.stress = np.max(self.stress_mat)
+
+
+            # Display stress map
+            stress_img = self.stress_mat.copy()/self.stress
+            if self.dofpn < 3 and self.nelz == 0:
+                params = {
+                    'prefix': self.probname+"_stress",
+                    'iternum': self.itercount,
+                    'time': 'none',
+                    'filetype': 'png',
+                    'dir': "iterations"
+                }
+                create_2d_imag(stress_img, **params)
+            else:
+                params = {
+                    'prefix': self.probname+"_stress",
+                    'iternum': self.itercount,
+                    'time': 'none',
+                    'dir': "iterations"
+                }
+                create_3d_geom(stress_img, **params)
+
 
     def filter_sens_sigmund(self):
         """
@@ -522,8 +547,8 @@ class Topology:
         if self.nelz == 0:  #  2D problem
 
             Y, X = np.indices((self.nely, self.nelx))
-            e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1, 1), axis=1)
-            e2sdofmap = np.add(e2sdofmap, self.dofpn * (Y + X * (self.nely + 1)))
+            e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1,1), axis=1)
+            e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (Y + X * (nely + 1))", global_dict={"dofpn":self.dofpn, "nely":self.nely})
             Qe = self.d[e2sdofmap]
             QeK = np.tensordot(Qe, self.Ke, axes=(0, 0))
             Qe_T = np.swapaxes(Qe, 2, 1).T
@@ -535,27 +560,27 @@ class Topology:
             X *= self.nely + 1
             Z *= (self.nelx + 1) * (self.nely + 1)
             e2sdofmap = np.expand_dims(self.e2sdofmapi.reshape(-1, 1, 1), axis=1)
-            e2sdofmap = np.add(e2sdofmap, self.dofpn * (X + Y + Z))
+            e2sdofmap = ne.evaluate("e2sdofmap + dofpn * (X + Y + Z)", global_dict={"dofpn":self.dofpn})
             Qe = self.d[e2sdofmap]
             QeK = np.tensordot(Qe, self.Ke, axes=(0, 0))
             Qe_T = np.swapaxes(Qe.T, 2, 0)
             QeKQe = np.einsum("klmn,klmn->klm", QeK, Qe_T)
 
         # Update TMP
-        if self.probtype == "comp":
-            self.objfval += ((self.desvars ** self.p) * QeKQe).sum()
-            tmp = -self.p * self.desvars ** (self.p - 1) * QeKQe
+        if self.probtype == 'comp':
+            self.objfval += ne.evaluate("sum((desvars ** p) * QeKQe)", global_dict={"desvars":self.desvars, "p":self.p})
+            tmp = ne.evaluate("- p * desvars ** (p - 1) * QeKQe", global_dict={"desvars":self.desvars, "p":self.p})
 
-        elif self.probtype == "heat":
-            obj = VOID + (1 - VOID) * self.desvars ** self.p
-            self.objfval += (obj * QeKQe).sum()
-            fac1 = -(1 - VOID) * self.p * self.desvars ** (self.p - 1)
-            tmp = fac1 * QeKQe
+        elif self.probtype == 'heat':
+            obj = ne.evaluate("VOID + (1 - VOID) * desvars ** p", global_dict={"desvars":self.desvars, "p":self.p, "VOID":VOID})
+            self.objfval += ne.evaluate("sum(obj * QeKQe)")
+            fac1 = ne.evaluate("- (1 - VOID) * p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p, "VOID":VOID})
+            tmp = ne.evaluate("fac1 * QeKQe")
 
-        elif self.probtype == "mech":
-            self.objfval = self.d[self.loaddofout].sum()
-            tmp = self.p * self.desvars ** (self.p - 1)
-
+        elif self.probtype == 'mech':
+            self.objfval = ne.evaluate("sum(d)", global_dict={"d":self.d[self.loaddofout]})
+            tmp = ne.evaluate("p * desvars ** (p - 1)", global_dict={"desvars":self.desvars, "p":self.p})
+            
             if self.nelz == 0:
                 QeOut_T = np.swapaxes(self.dout[e2sdofmap], 2, 1).T
                 op = np.einsum("mnk,mnk->mn", QeK, QeOut_T)
@@ -619,7 +644,8 @@ class Topology:
             move = 0.1
         else:
             move = 0.2
-        lam1, lam2 = 0.0, 100e3
+
+        lam1, lam2 = 0, 100e3
         dims = self.desvars.shape
         while (lam2 - lam1) / (lam2 + lam1) > 1e-8 and lam2 > 1e-40:
             lammid = 0.5 * (lam1 + lam2)
@@ -758,46 +784,53 @@ class Topology:
                     )
                     if self.probtype == "comp" or self.probtype == "mech":
                         updatedKe = self.desvars[ely, elx] ** self.p * self.Ke
-                    elif self.probtype == "heat":
-                        updatedKe = (
-                            VOID + (1 - VOID) * self.desvars[ely, elx] ** self.p
-                        ) * self.Ke
-                    mask = np.ones(e2sdofmap.size, dtype=int)
-
-                    utils.update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
-
-        else:  #  3D problem
+                    elif self.probtype == 'heat':
+                        updatedKe = (self.void + (1 - self.void) * \
+                        self.desvars[ely, elx] ** self.p) * self.Ke
+                    K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
+        else: #  3D problem
             for elz in range(self.nelz):
                 for elx in range(self.nelx):
                     for ely in range(self.nely):
-                        e2sdofmap = self.e2sdofmapi + self.dofpn * (
-                            ely
-                            + elx * (self.nely + 1)
-                            + elz * (self.nelx + 1) * (self.nely + 1)
-                        )
-                        if self.probtype == "comp" or self.probtype == "mech":
-                            updatedKe = self.desvars[elz, ely, elx] ** self.p * self.Ke
-                        elif self.probtype == "heat":
-                            updatedKe = (
-                                VOID
-                                + (1 - VOID) * self.desvars[elz, ely, elx] ** self.p
-                            ) * self.Ke
-                        mask = np.ones(e2sdofmap.size, dtype=int)
-                        utils.update_add_mask_sym(K, updatedKe, e2sdofmap, mask)
+                        e2sdofmap = self.e2sdofmapi + self.dofpn *\
+                                    (ely + elx * (self.nely + 1) + elz *\
+                                    (self.nelx + 1) * (self.nely + 1))
+                        if self.probtype == 'comp' or self.probtype == 'mech':
+                            updatedKe = self.desvars[elz, ely, elx] ** \
+                            self.p * self.Ke
+                        elif self.probtype == 'heat':
+                            updatedKe = (self.void + (1 - self.void) * \
+                            self.desvars[elz, ely, elx] ** self.p) * self.Ke
+                        K = self._update_add_mask_sym(K, updatedKe, e2sdofmap)
 
-        K.delete_rowcols(self._rcfixed)  #  Del constrained rows and columns
+
+        # Del constrained rows and columns
+        # It is faster to convert and operate on the matrix than to slice the
+        # original dok_matrix.
+        K = K.tocsr()
+        K = K[self._rcfixed]
+        K = K.tocsc()
+        K = K[:,self._rcfixed]
+
         return K
 
-## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
-## Jacobi-prconditioner:
-class diag_prec:
-      def __init__(self, A):
-          self.shape = A.shape
-          n = self.shape[0]
-          self.dinv = np.empty(n)
-          for i in range(n):
-              self.dinv[i] = 1.0 / A[i,i]
-      def precon(self, x, y):
-          np.multiply(x, self.dinv, y)
+    # Adapted from the PySparse documentation, in order to act as a substitute
+    # for the method of the same name it provided for sparse matrices.
+    # Fastest way I could find to do this, but currently it is the
+    # implementation's greatest bottleneck by far.
+    # Fills just the upper triangle of the matrix, because it is symmetric and
+    # it fits with MUMPS's way of handling sym-pos-def matrices.
+    def _update_add_mask_sym(self, A, B, ind):
+        for i in range(len(ind)):
+            for j in range(i, len(ind)):
+                k = dict.get(A, (ind[i], ind[j]), 0)
+                A._update({(ind[i],ind[j]):k+B[i,j]})
+
+        return A
+
+    # Calculates von Mises criterion
+    def _von_Mises(self, s11, s22, s33, s12, s13, s23):
+        return np.sqrt(0.5*((s11 - s22)**2 + (s22 - s33)**2 + (s33 - s11)**2 + 6*(s12**2 + s13**2 + s23**2)))
+
 
 # EOF topology.py

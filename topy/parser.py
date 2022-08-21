@@ -3,11 +3,13 @@
 # =============================================================================
 # Parse a ToPy problem definition (TPD) file to a Python dictionary.
 #
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 import numpy as np
+from scipy import sparse
 
 import scipy.sparse as sp_sparse
 #from pysparse import spmatrix
@@ -50,15 +52,16 @@ def tpd_file2dict(fname: str) -> dict:
         s = f.read()
 
     # Check for file version header, and parse:
-
-    if not s.startswith("[ToPy Problem Definition File v2007]"):
-        raise Exception("Input file or format not recognised")
-
-    d = _parsev2007file(s)
-    logger.info("ToPy problem definition (TPD) file successfully parsed.")
-    logger.info("TPD file name: {} (v2007)\n".format(fname))
-
-
+    if s.startswith('[ToPy Problem Definition File v2007]'):
+        d = _parsev2007file(s)
+        logger.info('ToPy problem definition (TPD) file successfully parsed.')
+        logger.info('TPD file name: {} (v2007)\n'.format(fname))
+    elif s.startswith('[ToPy Problem Definition File v2020]'):
+        d = _parsev2020file(s)
+        logger.info('ToPy problem definition (TPD) file successfully parsed.')
+        logger.info('TPD file name: {} (v2020)\n'.format(fname))
+    else:
+        raise Exception('Input file or format not recognised')
     # Very basic parameter checking, exit on error:
     _checkparams(d)
     # Future file versions, enter <if> and <elif> as per above and define new
@@ -103,14 +106,9 @@ def _parsev2007file(s):
     snew = [line.replace(" ", "") for line in snew]
     snew = list(filter(len, snew))
 
-    d = dict([line.split(':') for line in snew])
-    return _parse_dict(d)
+    d = dict([line.split(':') for line in snew]) 
 
-
-
-
-def _parse_dict(d):
-    # Read/convert minimum required input and convert, else exit:
+   # Read/convert minimum required input and convert, else exit:
     d = d.copy()
     try:
 
@@ -127,10 +125,29 @@ def _parse_dict(d):
         d['ETA'] = str(d['ETA']).lower()
 
         d['ELEM_TYPE'] = d['ELEM_K']
-        d['ELEM_K'] = eval(d['ELEM_TYPE'])
     except:
         raise ValueError("One or more parameters incorrectly specified.")
 
+
+    # Material properties (for backwards compatibility)
+    d['ELEM_E'] = 1.0
+    d['ELEM_NU'] = 1.0/3
+    d['ELEM_TC'] = 1.0
+    d['ELEM_L'] = 0.5
+    d['THICKNESS'] = 1.0
+
+    try:
+        K, B, C = create_element[d['ELEM_TYPE']](
+                    d['ELEM_L'], d['ELEM_E'], d['ELEM_NU'], d['ELEM_TC'], d['THICKNESS']
+                )
+        d['ELEM_K'] = K
+        d['ELEM_B'] = B
+        d['ELEM_C'] = C
+    except:
+        raise ValueError("Element name incorrectly specified.")
+
+    # Type of approach for topology optimization (backwards compatibility)
+    d['TO_TYPE'] = "trad"
 
     # Check for number of iterations or change stop value:
     try:
@@ -166,7 +183,7 @@ def _parse_dict(d):
 
     # Check for active elements:
     try:
-        d['ACTV_ELEM'] = _tpd2vec(d['ACTV_ELEM'], int) - 1
+        d['ACTV_ELEM'] = (_tpd2vec(d['ACTV_ELEM']) - 1).astype(np.int64)
     except KeyError:
         d['ACTV_ELEM'] = _tpd2vec('', int)
     except AttributeError:
@@ -174,7 +191,7 @@ def _parse_dict(d):
 
     # Check for passive elements:
     try:
-        d['PASV_ELEM'] = _tpd2vec(d['PASV_ELEM'], int) - 1
+        d['PASV_ELEM'] = (_tpd2vec(d['PASV_ELEM']) - 1).astype(np.int64)
     except KeyError:
         d['PASV_ELEM'] = _tpd2vec('', int)
     except AttributeError:
@@ -218,10 +235,178 @@ def _parse_dict(d):
     # The following entries are created and added to the dictionary,
     # they are not specified in the ToPy problem definition file:
     Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
+    (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint
+    d['K'] = sparse.dok_matrix((Ksize, Ksize), dtype=np.double) # Global stiffness matrix
+    d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
+    d['DOF_PN']) #  Initial element to structure DOF mapping
+
+    return d
+
+def _parsev2020file(s):
+    """
+    Parse a version 2020 ToPy problem definition file to a dictionary.
+
+    """
+    snew = s.splitlines()[1:]
+    snew = [line.split('#')[0] for line in snew] # Get rid of all comments
+    snew = [line.replace('\t', '') for line in snew]
+    snew = [line.replace(' ', '') for line in snew]
+    snew = list(filter(len, snew))
+
+    d = dict([line.split(':') for line in snew]) 
+
+    # Read/convert minimum required input and convert, else exit:
+    try:
+        d['PROB_TYPE'] = d['PROB_TYPE'].lower()
+        d['TO_TYPE'] = d['TO_TYPE'].lower()
+        d['VOL_FRAC']   = float(d['VOL_FRAC'])
+        d['FILT_RAD'] = float(d['FILT_RAD'])
+        d['P_FAC'] = float(d['P_FAC'])
+        d['NUM_ELEM_X'] = int(d['NUM_ELEM_X'])
+        d['NUM_ELEM_Y'] = int(d['NUM_ELEM_Y'])
+        d['NUM_ELEM_Z'] = int(d['NUM_ELEM_Z'])
+        d['DOF_PN'] = int(d['DOF_PN'])
+        d['ETA'] = str(d['ETA']).lower()
+        d['ELEM_TYPE'] = d['ELEM_K']
+        d['NORMAL_MAX'] = float(d['NORMAL_MAX'])*1e6
+        d['SHEAR_MAX'] = float(d['SHEAR_MAX'])*1e6
+    except:
+        raise ValueError('One or more parameters incorrectly specified.')
+
+    # Get material properties
+
+    # Modulus of Elasticity
+    try:
+        d['ELEM_E'] = float(d['ELEM_E'])*1e+9 # GPa to Pa
+    except:
+        d['ELEM_E'] = 1.0
+
+    # Poisson's ratio
+    try:
+        d['ELEM_NU'] = float(d['ELEM_NU'])
+    except:
+        d['ELEM_NU'] = 1.0/3
+
+    # Thermal conductivity
+    try:
+        d['ELEM_TC'] = float(d['ELEM_TC'])
+    except:
+        d['ELEM_TC'] = 1.0
+
+    # Element length of side, halved (elements are squares or cubes)
+    try:
+        d['ELEM_L'] = float(d['ELEM_L'])*1e-3 # mm to m
+    except:
+        d['ELEM_L'] = 0.5
+
+    # Thickness (for 2D elements)
+    try:
+        d['THICKNESS'] = float(d['THICKNESS'])*1e-3 # mm to m
+    except:
+        d['THICKNESS'] = 1.0
+
+    try:
+        K, B, C = create_element[d['ELEM_TYPE']](
+                    d['ELEM_L'], d['ELEM_E'], d['ELEM_NU'], d['ELEM_TC'], d['THICKNESS']
+                )
+        d['ELEM_K'] = K
+        d['ELEM_B'] = B
+        d['ELEM_C'] = C
+    except:
+        raise ValueError("Element name incorrectly specified.")
+
+
+    # Check for number of iterations or change stop value:
+    try:
+        d['NUM_ITER'] = int(d['NUM_ITER'])
+    except KeyError:
+        try:
+            d['CHG_STOP'] = float(d['CHG_STOP'])
+        except KeyError:
+            raise ValueError("Neither NUM_ITER nor CHG_STOP was declared")
+
+    # Check for GSF penalty factor:
+    try:
+        d['Q_FAC'] = float(d['Q_FAC'])
+    except KeyError:
+        pass
+
+    # Check for continuation parameters:
+    try:
+        d['P_MAX'] = float(d['P_MAX'])
+        d['P_HOLD'] = int(d['P_HOLD'])
+        d['P_INCR'] = float(d['P_INCR'])
+        d['P_CON'] = float(d['P_CON'])
+    except KeyError:
+        pass
+
+    try:
+        d['Q_MAX'] = float(d['Q_MAX'])
+        d['Q_HOLD'] = int(d['Q_HOLD'])
+        d['Q_INCR'] = float(d['Q_INCR'])
+        d['Q_CON'] = float(d['Q_CON'])
+    except KeyError:
+        pass
+
+    # Check for active elements:
+    try:
+        d['ACTV_ELEM'] = (_tpd2vec(d['ACTV_ELEM']) - 1).astype(np.int64)
+    except KeyError:
+        d['ACTV_ELEM'] = _tpd2vec('')
+    except AttributeError:
+        pass
+
+    # Check for passive elements:
+    try:
+        d['PASV_ELEM'] = (_tpd2vec(d['PASV_ELEM']) - 1).astype(np.int64)
+    except KeyError:
+        d['PASV_ELEM'] = _tpd2vec('')
+    except AttributeError:
+        pass
+
+    # Check if diagonal quadratic approximation is required:
+    try:
+        d['APPROX'] = d['APPROX'].lower()
+    except KeyError:
+        pass
+
+    # How to do the following compactly (perhaps loop through keys)? Check for
+    # keys and create fixed DOF vector, loaded DOF vector and load values
+    # vector.
+    dofpn = d['DOF_PN']
+
+    x = d.get('FXTR_NODE_X', '')
+    y = d.get('FXTR_NODE_Y', '')
+    z = d.get('FXTR_NODE_Z', '')
+    d['FIX_DOF'] = _dofvec(x, y, z, dofpn)
+
+    x = d.get('LOAD_NODE_X', '')
+    y = d.get('LOAD_NODE_Y', '')
+    z = d.get('LOAD_NODE_Z', '')
+    d['LOAD_DOF'] = _dofvec(x, y, z, dofpn)
+
+    x = d.get('LOAD_VALU_X', '')
+    y = d.get('LOAD_VALU_Y', '')
+    z = d.get('LOAD_VALU_Z', '')
+    d['LOAD_VAL'] = _valvec(x, y, z)
+
+    x = d.get('LOAD_NODE_X_OUT', '')
+    y = d.get('LOAD_NODE_Y_OUT', '')
+    z = d.get('LOAD_NODE_Z_OUT', '')
+    d['LOAD_DOF_OUT'] = _dofvec(x, y, z, dofpn)
+
+    x = d.get('LOAD_VALU_X_OUT', '')
+    y = d.get('LOAD_VALU_Y_OUT', '')
+    z = d.get('LOAD_VALU_Z_OUT', '')
+    d['LOAD_VAL_OUT'] = _valvec(x, y, z)
+
+
+    # The following entries are created and added to the dictionary,
+    # they are not specified in the ToPy problem definition file:
+    Ksize = d['DOF_PN'] * (d['NUM_ELEM_X'] + 1) * (d['NUM_ELEM_Y'] + 1) * \
     (d['NUM_ELEM_Z'] + 1) #  Memory allocation hint for PySparse
-    d['K'] = sp_sparse.coo_matrix( (Ksize, Ksize) ) #  Global stiffness matrix
-    #print(Ksize)
-    #d['K'] = np.zeros( (Ksize, Ksize) ) #  Global stiffness matrix
+    #d['K'] = spmatrix.ll_mat_sym(Ksize, Ksize) #  Global stiffness matrix
+    d['K'] = sparse.dok_matrix((Ksize, Ksize), dtype=np.double)
     d['E2SDOFMAPI'] =  _e2sdofmapinit(d['NUM_ELEM_X'], d['NUM_ELEM_Y'], \
     d['DOF_PN']) #  Initial element to structure DOF mapping
 
@@ -382,9 +567,9 @@ def _checkparams(d):
 
             Logger.display('\n\tToPy warning: Rigid body motion in 2D is possible!\n')
     if d['DOF_PN'] == 3:
-        if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d\
+        if 'FXTR_NODE_X' not in d or 'FXTR_NODE_Y' not in d \
         or 'FXTR_NODE_Z' not in d:
-            Logger.display('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
+            logger.info('\n\tToPy warning: Rigid body motion in 3D is possible!\n')
 
 
 # EOF parser.py

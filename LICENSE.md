@@ -1,6 +1,7 @@
 The MIT License (MIT)
 
-Copyright (c) [2011, 2015, 2016, 2017] [William Hunter]  
+Copyright (c) [2011, 2015, 2016, 2017] [William Hunter]
+Copyright (c) [2020, 2021] [Tarcísio L. de Oliveira]
 Copyright (c) [2018] [Francisco Sanchez Arroyo]
 
 

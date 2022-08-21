@@ -3,8 +3,9 @@
 # =============================================================================
 # Functions in order to visualise 2D and 3D NumPy arrays.
 #
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, 2016, 2017 William Hunter.
+# Copyright (C) 2020 Tarcísio L. de Oliveira
 # =============================================================================
 """
 from typing import Any
@@ -72,12 +73,12 @@ def create_2d_imag(x, **kwargs):
     # === Start of Matplotlib commands ===
     # ====================================
     # x = flipud(x) #  Check your matplotlibrc file; might plot upside-down...
-    figure()  # open a figure
-    if "title" in kwargs:
-        title(kwargs["title"])
-        imshow(-x, cmap=cm.gray, aspect="equal", interpolation="nearest")
-    imshow(-x, cmap=cm.gray, aspect="equal", interpolation="nearest")
-    axis("off")
+    figure() # open a figure
+    if 'title' in kwargs:
+        title(kwargs['title'])
+        imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
+    imshow(-x, cmap=cm.gray, aspect='equal', interpolation='nearest')
+    axis('off')
     # ==================================
     # === End of Matplotlib commands ===
     # ==================================

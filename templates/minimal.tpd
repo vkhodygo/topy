@@ -1,9 +1,10 @@
-[ToPy Problem Definition File v2007]
+[ToPy Problem Definition File v2020]
 
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # This file contains a minimum amount of 'parseable' keywords.
 
 # If you don't have at least these, ToPy will complain and won't run.
+TO_TYPE    : trad
 PROB_TYPE  : comp #  minimum compliance problem
 PROB_NAME  : mbb_beam_minimal
 ETA        : 0.5 #  Or use 'exp' (without quotes)

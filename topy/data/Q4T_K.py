@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 # =============================================================================
-# Write the stiffness matrix of finite element to file. The created file name
-# is equal to the string between the underscores of *this* file's name, plus a
-# 'K' extension, e.g.,
+# Creates the stiffness matrix as requested, using the material properties 
+# provided in the TPD file (for v2020 files).
 #
-#     python ELEM_K.py
-#
-# gives a file named ELEM.K in the same directory.
-#
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 # Copyright (C) 2008, 2015, William Hunter.
+# Copyright (C) 2020, 2021, Tarcísio L. de Oliveira
 # =============================================================================
 """
 from __future__ import division
@@ -21,36 +17,28 @@ import os
 from sympy import symbols, Matrix, diff, integrate, zeros
 from numpy import abs, array
 
-from .matlcons import *
-from ..helper_functions import my_map
+from ..utils import get_logger
 
 
 logger = get_logger(__name__)
-# Get file name:
 
-fname = __file__.split('_')[0] + '.K'
-fname = __file__[:-5] + '.K'
-print("working on filename: {0}".format(fname))
-
-try:
-    f = open(fname)
-    print('{0} (stiffness matrix) exists!'.format(fname))
-    f.close()
-except IOError:
-
+def create_K(_L, _E, _nu, _k, _t):
+    # Initialize variables
+    _a, _b, _c = _L, _L, _L  # element dimensions (half-lengths)
+    _G = _E / (2 * (1 + _nu))  # modulus of rigidity
+    _g = _E /  ((1 + _nu) * (1 - 2 * _nu))
+    
     # SymPy symbols:
-    a, b, x, y = symbols('a b x y')
-    E, nu = symbols('E nu')
+    x, y = symbols('x y')
     N1, N2, N3, N4 = symbols('N1 N2 N3 N4')
-    k = symbols('k')
     xlist = [x, x, x, x]
     ylist = [y, y, y, y]
 
     # Shape functions:
-    N1 = (a - x) * (b - y) / (4 * a * b)
-    N2 = (a + x) * (b - y) / (4 * a * b)
-    N3 = (a + x) * (b + y) / (4 * a * b)
-    N4 = (a - x) * (b + y) / (4 * a * b)
+    N1 = (_a - x) * (_b - y) / (4 * _a * _b)
+    N2 = (_a + x) * (_b - y) / (4 * _a * _b)
+    N3 = (_a + x) * (_b + y) / (4 * _a * _b)
+    N4 = (_a - x) * (_b + y) / (4 * _a * _b)
 
     # Create strain-displacement matrix B:
 
@@ -60,25 +48,25 @@ except IOError:
     B = Matrix([B0, B1])
 
     # Create conductivity matrix:
-    C = Matrix([[k, 0],
-                [0, k]])
+    C = Matrix([[_k, 0],
+                [0, _k]])
 
     dK = B.T * C * B
 
     # Integration:
-
-    print('SymPy is integrating: K for Q4T...')
-
-    K = dK.integrate((x, -a, a),(y, -b, b))
+    logger.info('SymPy is integrating: K for Q4T...')
+    K = dK.integrate((x, -_a, _a),(y, -_b, _b))
 
     # Convert SymPy Matrix to NumPy array:
-    K = array(K.subs({a:_a, b:_b, k:_k})).astype('double')
+    K = _t * array(K, dtype='double')
+    C = array(C, dtype='double')
 
     # Set small (<< 0) values equal to zero:
     K[abs(K) < 1e-6] = 0
 
-    # Create file:
-    K.dump(fname)
+    # Return result:
+    logger.info('Created stiffness matrix.')
+    return K, B, C
 
     print('Created {0} (stiffness matrix).'.format(fname))
 

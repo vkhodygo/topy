@@ -1,11 +1,11 @@
-[ToPy Problem Definition File v2007]
+[ToPy Problem Definition File v2020]
 
 # =============================================================================
-# Author: William Hunter
+# Author: William Hunter, Tarcísio L. de Oliveira
 #
 # Template file explaining the ToPy Problem Definition file format.
 #
-# The file *must* start with the identifier '[ToPy Input File v2007]' and then
+# The file *must* start with the identifier '[ToPy Input File v2020]' and then
 # a blank line.
 #
 # Comments may be placed after the the hash (#) character like these lines and
@@ -28,6 +28,30 @@
 #
 # NOTE: This template does not actually define a valid problem!
 # ==============================================================================
+
+# ===========================
+# === Optimization method ===
+# ===========================
+# Is one of 'trad' = traditional SIMP topology optimization
+#           'gen'  = new experimental approach
+# The 'gen' method only fully works with minimum compliance and partially with
+# heat conduction problems. For mechanism design, it is equivalent to 'trad',
+# as is does not converge. Also, do not place loads in neighboring nodes for 
+# minimum compliance for that method, as it will make the algorithm less 
+# effective.
+TO_TYPE: gen
+
+# ===========================
+# === Material properties ===
+# ===========================
+# Necessary for 'gen' methods and accurate stress calculations. If you do not
+# need them, you can leave them out.
+ELEM_E:      186          # Modulus of elasticity [GPa]
+ELEM_NU:     0.29         # Poisson's ratio
+ELEM_TC:     51.9         # Thermal conductivity [W/(m*K)]
+ELEM_L:      25           # Half-length of element [mm]
+THICKNESS:   50	          # Plate thickness, for 2D problems [mm]
+
 
 # ====================
 # === Problem type ===
